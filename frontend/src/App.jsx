@@ -14,7 +14,7 @@ export default function App() {
   const fetchArticles = async (searchQuery) => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`http://https://akademik-search.onrender.com/api/search?q=${encodeURIComponent(searchQuery)}`);
       const result = await response.json();
       if (result.status === 'success') {
         setArticles(result.data);
