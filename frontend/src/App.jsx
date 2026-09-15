@@ -1,125 +1,96 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState } from 'react';
 
-export default function App() {
-  const [query, setQuery] = useState('personality');
-  const [articles, setArticles] = useState([]);
+function App() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [copiedId, setCopiedId] = useState(null);
+  const [activeModal, setActiveModal] = useState(null);
 
-  const cleanText = (text) => {
-    if (!text) return '';
-    return text.replace(/\uFFFD/g, '').replace(/Yay.n/g, 'Yayın');
-  };
-
-  const fetchArticles = async (searchQuery) => {
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!query) return;
     setLoading(true);
     try {
-      const response = await fetch(`http://https://akademik-search.onrender.com/api/search?q=${encodeURIComponent(searchQuery)}`);
-      const result = await response.json();
-      if (result.status === 'success') {
-        setArticles(result.data);
-      }
-    } catch (error) {
-      console.error("Arama hatası:", error);
-    } finally {
-      setLoading(false);
+      const response = await fetch(`https://akademik-search-api.onrender.com/api/search?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      setResults(data.results || []);
+    } catch (err) {
+      console.error(err);
     }
-  };
-
-  useEffect(() => {
-    fetchArticles('personality');
-  }, []);
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    if (query.trim()) {
-      fetchArticles(query);
-    }
-  };
-
-  const copyCitation = (article) => {
-    const citation = `${article.authors.join(', ')} (${article.year}). ${article.title}. ${article.publisher}.`;
-    navigator.clipboard.writeText(citation);
-    setCopiedId(article.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setLoading(false);
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#1e293b', fontFamily: 'sans-serif', padding: '20px' }}>
-      <header style={{ backgroundColor: '#ffffff', padding: '15px 20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#4f46e5', margin: 0 }}>
-          Akademik Search
-        </h1>
-        <span style={{ backgroundColor: '#e0e7ff', color: '#3730a3', padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
-          Canlı API Bağlı (Node.js)
-        </span>
-      </header>
-
-      <main style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
+      <main style={{ flex: 1, padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+        <h1 style={{ textAlign: 'center', color: '#4f46e5' }}>Akademik Search</h1>
+        
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale başlığı, yazar adı veya konu girin..."
-            style={{ flex: 1, padding: '14px 18px', fontSize: '16px', border: '1px solid #cbd5e1', borderRadius: '10px', outline: 'none' }}
+            placeholder="Makale, yazar veya konu ara..."
+            style={{ flex: 1, padding: '12px', borderRadius: '6px', border: '1px solid #ccc' }}
           />
-          <button
-            type="submit"
-            style={{ backgroundColor: '#4f46e5', color: '#ffffff', border: 'none', padding: '14px 24px', fontSize: '16px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
+          <button type="submit" style={{ padding: '12px 24px', background: '#4f46e5', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
             {loading ? 'Aranıyor...' : 'Ara'}
           </button>
         </form>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {articles.length === 0 && !loading && (
-            <p style={{ textAlign: 'center', color: '#64748b' }}>Arama yapmak için yukarıya bir kelime yazıp "Ara" butonuna basın.</p>
-          )}
-
-          {articles.map((item) => (
-            <div key={item.id} style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 8px 0', color: '#0f172a' }}>
-                  {cleanText(item.title)}
-                </h3>
-                <span style={{ backgroundColor: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                  {item.year || 'Tarihsiz'}
-                </span>
-              </div>
-
-              <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                <span><strong>Yazar:</strong> {item.authors.length > 0 ? cleanText(item.authors.join(', ')) : 'Bilinmiyor'}</span>
-                <span><strong>Kurum:</strong> {cleanText(item.institution)}</span>
-                <span><strong>Atıf:</strong> {item.citations}</span>
-              </div>
-
-              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
-                <span style={{ fontStyle: 'italic', color: '#64748b' }}>{cleanText(item.publisher)}</span>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => copyCitation(item)}
-                    style={{ backgroundColor: '#f1f5f9', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', color: '#334155', fontWeight: '500' }}
-                  >
-                    {copiedId === item.id ? 'Atıf Kopyalandı' : 'Atıf Yap'}
-                  </button>
-
-                  {item.pdf_url && (
-                    <a
-                      href={item.pdf_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ backgroundColor: '#eef2ff', color: '#4f46e5', textDecoration: 'none', padding: '6px 12px', borderRadius: '6px', fontWeight: '500' }}
-                    >
-                      Yayına Git
-                    </a>
-                  )}
-                </div>
-              </div>
+        <div>
+          {results.map((item, index) => (
+            <div key={index} style={{ border: '1px solid #eee', padding: '15px', borderRadius: '8px', marginBottom: '10px', background: '#fff' }}>
+              <h3 style={{ margin: '0 0 5px 0' }}>
+                <a href={item.doi || item.id} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', textDecoration: 'none' }}>
+                  {item.title}
+                </a>
+              </h3>
+              <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Yayın Yılı: {item.publication_year}</p>
             </div>
           ))}
         </div>
       </main>
+
+      {/* FOOTER & YASAL SAYFALAR */}
+      <footer style={{ borderTop: '1px solid #eee', padding: '20px', textAlign: 'center', background: '#f9fafb', fontSize: '14px' }}>
+        <p>© 2026 akademiksearch.com.tr - Tüm Hakları Saklıdır.</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '10px' }}>
+          <button onClick={() => setActiveModal('about')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Hakkımızda</button> |
+          <button onClick={() => setActiveModal('privacy')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Gizlilik Politikası</button> |
+          <button onClick={() => setActiveModal('contact')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>İletişim</button>
+        </div>
+      </footer>
+
+      {/* MODAL PENCERELERİ */}
+      {activeModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#fff', padding: '30px', borderRadius: '8px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+            {activeModal === 'about' && (
+              <>
+                <h2>Hakkımızda</h2>
+                <p>Akademik Search, dünya genelindeki bilimsel yayınlara, akademik makalelere ve araştırmalara hızlı erişim sağlamak amacıyla geliştirilmiş açık bir arama motorudur. Verilerimiz OpenAlex altyapısıyla anlık olarak sunulmaktadır.</p>
+              </>
+            )}
+            {activeModal === 'privacy' && (
+              <>
+                <h2>Gizlilik Politikası</h2>
+                <p>akademiksearch.com.tr üzerinde kullanıcıların kişisel verileri saklanmaz. Sitemiz üçüncü taraf reklam sağlayıcıları (Google AdSense gibi) aracılığıyla çerezler kullanabilir.</p>
+              </>
+            )}
+            {activeModal === 'contact' && (
+              <>
+                <h2>İletişim</h2>
+                <p>Görüş, öneri ve işbirliği talepleriniz için bizimle iletişime geçebilirsiniz:</p>
+                <p><strong>E-posta:</strong> info@akademiksearch.com.tr</p>
+              </>
+            )}
+            <button onClick={() => setActiveModal(null)} style={{ marginTop: '20px', padding: '8px 16px', background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Kapat</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default App;
