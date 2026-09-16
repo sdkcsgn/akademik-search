@@ -12,29 +12,13 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Arama terimi girilmedi.' });
     }
 
-    let rawResults = [];
+    // OpenAlex genel arama sorgusu
+    const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
+    const response = await axios.get(searchUrl);
+    let rawResults = response.data.results || [];
 
-    // 1. Aşamada yazar ismi odaklı arama yapılır
-    try {
-      const authorUrl = `https://api.openalex.org/works?filter=raw_author_name.search:${encodeURIComponent(query)}`;
-      const authorRes = await axios.get(authorUrl);
-      if (authorRes.data && authorRes.data.results && authorRes.data.results.length > 0) {
-        rawResults = authorRes.data.results;
-      }
-    } catch (e) {
-      console.log('Yazar filtre hatasi pas gecildi.');
-    }
-
-    // 2. Aşamada yazar sonucu gelmezse genel aramaya düşer
-    if (rawResults.length === 0) {
-      const generalUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
-      const generalRes = await axios.get(generalUrl);
-      if (generalRes.data && generalRes.data.results) {
-        rawResults = generalRes.data.results;
-      }
-    }
-
-    const results = rawResults.map(item => {
+    // Gelen sonuçları işleme
+    let results = rawResults.map(item => {
       const authors = item.authorships 
         ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean)
         : [];
@@ -52,6 +36,16 @@ app.get('/api/search', async (req, res) => {
         authors: authors.slice(0, 5),
         venue: venue
       };
+    });
+
+    // Arama terimi yazar isimlerinde geçen makaleleri listenin en başına taşı
+    const searchLower = query.toLowerCase();
+    results.sort((a, b) => {
+      const aHasAuthor = a.authors.some(name => name.toLowerCase().includes(searchLower));
+      const bHasAuthor = b.authors.some(name => name.toLowerCase().includes(searchLower));
+      if (aHasAuthor && !bHasAuthor) return -1;
+      if (!aHasAuthor && bHasAuthor) return 1;
+      return 0;
     });
 
     res.json({ results });
