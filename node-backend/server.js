@@ -14,12 +14,27 @@ app.get('/api/search', async (req, res) => {
 
     const response = await axios.get(`https://api.openalex.org/works?search=${encodeURIComponent(query)}`);
     
-    const results = response.data.results.map(item => ({
-      id: item.id,
-      title: item.title,
-      publication_year: item.publication_year,
-      doi: item.doi
-    }));
+    const results = response.data.results.map(item => {
+      // Yazarların isimlerini çek
+      const authors = item.authorships 
+        ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean).slice(0, 5)
+        : [];
+
+      // Yayınlandığı Dergi / Konferans adı
+      const venue = item.primary_location && item.primary_location.source 
+        ? item.primary_location.source.display_name 
+        : null;
+
+      return {
+        id: item.id,
+        title: item.title,
+        publication_year: item.publication_year,
+        doi: item.doi,
+        cited_by_count: item.cited_by_count,
+        authors: authors,
+        venue: venue
+      };
+    });
 
     res.json({ results });
   } catch (error) {
