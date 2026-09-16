@@ -5,6 +5,19 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
+// Türkçe karakterleri İngilizceye çeviren yardımcı fonksiyon
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c');
+};
+
 app.get('/api/search', async (req, res) => {
   try {
     const query = req.query.q;
@@ -12,12 +25,10 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Arama terimi girilmedi.' });
     }
 
-    // OpenAlex genel arama sorgusu
     const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
     const response = await axios.get(searchUrl);
     let rawResults = response.data.results || [];
 
-    // Gelen sonuçları işleme
     let results = rawResults.map(item => {
       const authors = item.authorships 
         ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean)
@@ -38,14 +49,20 @@ app.get('/api/search', async (req, res) => {
       };
     });
 
-    // Arama terimi yazar isimlerinde geçen makaleleri listenin en başına taşı
-    const searchLower = query.toLowerCase();
+    // Arama terimlerini kelime kelime normalize et
+    const queryNormalized = normalizeText(query);
+    const queryWords = queryNormalized.split(' ').filter(w => w.length > 2);
+
+    // Sıralama Algoritması: Yazar adında aranan kelimeler geçen makaleleri en üste taşı
     results.sort((a, b) => {
-      const aHasAuthor = a.authors.some(name => name.toLowerCase().includes(searchLower));
-      const bHasAuthor = b.authors.some(name => name.toLowerCase().includes(searchLower));
-      if (aHasAuthor && !bHasAuthor) return -1;
-      if (!aHasAuthor && bHasAuthor) return 1;
-      return 0;
+      const aAuthorsNorm = a.authors.map(name => normalizeText(name)).join(' ');
+      const bAuthorsNorm = b.authors.map(name => normalizeText(name)).join(' ');
+
+      // Aranan kelimelerden kaç tanesi yazarda geçiyor?
+      const aMatches = queryWords.filter(word => aAuthorsNorm.includes(word)).length;
+      const bMatches = queryWords.filter(word => bAuthorsNorm.includes(word)).length;
+
+      return bMatches - aMatches; // En çok eşleşen yazarı en tepeye koy
     });
 
     res.json({ results });
