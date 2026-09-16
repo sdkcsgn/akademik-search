@@ -49,20 +49,29 @@ app.get('/api/search', async (req, res) => {
       };
     });
 
-    // Arama terimlerini kelime kelime normalize et
     const queryNormalized = normalizeText(query);
     const queryWords = queryNormalized.split(' ').filter(w => w.length > 2);
 
-    // Sıralama Algoritması: Yazar adında aranan kelimeler geçen makaleleri en üste taşı
+    // Gelişmiş Puanlama ve Sıralama Algoritması
     results.sort((a, b) => {
-      const aAuthorsNorm = a.authors.map(name => normalizeText(name)).join(' ');
-      const bAuthorsNorm = b.authors.map(name => normalizeText(name)).join(' ');
+      const aAuthorsNorm = a.authors.map(name => normalizeText(name));
+      const bAuthorsNorm = b.authors.map(name => normalizeText(name));
 
-      // Aranan kelimelerden kaç tanesi yazarda geçiyor?
-      const aMatches = queryWords.filter(word => aAuthorsNorm.includes(word)).length;
-      const bMatches = queryWords.filter(word => bAuthorsNorm.includes(word)).length;
+      // 1. Tam İsim Eşleşmesi Kontrolü (Örn: "sevcan yildiz")
+      const aExactMatch = aAuthorsNorm.some(name => name.includes(queryNormalized));
+      const bExactMatch = bAuthorsNorm.some(name => name.includes(queryNormalized));
 
-      return bMatches - aMatches; // En çok eşleşen yazarı en tepeye koy
+      if (aExactMatch && !bExactMatch) return -1;
+      if (!aExactMatch && bExactMatch) return 1;
+
+      // 2. Kelime Bazlı Eşleşme Puanı (Örn: Kaç kelime eşleşiyor?)
+      const aJoined = aAuthorsNorm.join(' ');
+      const bJoined = bAuthorsNorm.join(' ');
+
+      const aScore = queryWords.filter(word => aJoined.includes(word)).length;
+      const bScore = queryWords.filter(word => bJoined.includes(word)).length;
+
+      return bScore - aScore;
     });
 
     res.json({ results });
