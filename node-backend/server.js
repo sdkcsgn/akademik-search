@@ -14,23 +14,23 @@ app.get('/api/search', async (req, res) => {
 
     let rawResults = [];
 
-    // 1. Öncelik: Doğrudan yazar adı araması (Yazara özel arama)
+    // 1. Aşamada yazar ismi odaklı arama yapılır
     try {
-      const authorSearchUrl = `https://api.openalex.org/works?filter=author.display_name.search:${encodeURIComponent(query)}`;
-      const authorResponse = await axios.get(authorSearchUrl);
-      if (authorResponse.data && authorResponse.data.results) {
-        rawResults = authorResponse.data.results;
+      const authorUrl = `https://api.openalex.org/works?filter=raw_author_name.search:${encodeURIComponent(query)}`;
+      const authorRes = await axios.get(authorUrl);
+      if (authorRes.data && authorRes.data.results && authorRes.data.results.length > 0) {
+        rawResults = authorRes.data.results;
       }
     } catch (e) {
-      console.log('Yazar filtresi eslesmedi, genel aramaya geciliyor...');
+      console.log('Yazar filtre hatasi pas gecildi.');
     }
 
-    // 2. Öncelik: Yazar filtresi boş dönerse genel kelime araması
-    if (!rawResults || rawResults.length === 0) {
-      const generalSearchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
-      const generalResponse = await axios.get(generalSearchUrl);
-      if (generalResponse.data && generalResponse.data.results) {
-        rawResults = generalResponse.data.results;
+    // 2. Aşamada yazar sonucu gelmezse genel aramaya düşer
+    if (rawResults.length === 0) {
+      const generalUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
+      const generalRes = await axios.get(generalUrl);
+      if (generalRes.data && generalRes.data.results) {
+        rawResults = generalRes.data.results;
       }
     }
 
@@ -56,7 +56,7 @@ app.get('/api/search', async (req, res) => {
 
     res.json({ results });
   } catch (error) {
-    console.error('API Error:', error.message);
+    console.error('API Hatası:', error.message);
     res.status(500).json({ error: 'Sunucu hatası oluştu.' });
   }
 });
