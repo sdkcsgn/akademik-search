@@ -11,7 +11,7 @@ function App() {
     if (!query) return;
     setLoading(true);
     try {
-      const response = await fetch(`https://akademik-search-api.onrender.com/api/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch('[https://akademik-search.onrender.com/api/search?q=](https://akademik-search.onrender.com/api/search?q=)' + encodeURIComponent(query));}`);
       const data = await response.json();
       setResults(data.results || []);
     } catch (err) {
