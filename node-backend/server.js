@@ -12,15 +12,21 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Arama terimi girilmedi.' });
     }
 
-    const response = await axios.get(`https://api.openalex.org/works?search=${encodeURIComponent(query)}`);
+    // Hem başlık/özet hem de yazar ismi aramasını daha doğru harmanlayan sorgu
+    const response = await axios.get(`https://api.openalex.org/works?filter=author.displayName.search:${encodeURIComponent(query)}`);
     
-    const results = response.data.results.map(item => {
-      // Yazarların isimlerini çek
+    // Eğer yazar filtresi sonuç vermezse genel aramaya düş (Fallback)
+    let rawResults = response.data.results;
+    if (!rawResults || rawResults.length === 0) {
+      const fallbackResponse = await axios.get(`https://api.openalex.org/works?search=${encodeURIComponent(query)}`);
+      rawResults = fallbackResponse.data.results;
+    }
+
+    const results = rawResults.map(item => {
       const authors = item.authorships 
-        ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean).slice(0, 5)
+        ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean)
         : [];
 
-      // Yayınlandığı Dergi / Konferans adı
       const venue = item.primary_location && item.primary_location.source 
         ? item.primary_location.source.display_name 
         : null;
@@ -31,7 +37,7 @@ app.get('/api/search', async (req, res) => {
         publication_year: item.publication_year,
         doi: item.doi,
         cited_by_count: item.cited_by_count,
-        authors: authors,
+        authors: authors.slice(0, 5),
         venue: venue
       };
     });
