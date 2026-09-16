@@ -12,14 +12,26 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Arama terimi girilmedi.' });
     }
 
-    // Hem başlık/özet hem de yazar ismi aramasını daha doğru harmanlayan sorgu
-    const response = await axios.get(`https://api.openalex.org/works?filter=author.displayName.search:${encodeURIComponent(query)}`);
-    
-    // Eğer yazar filtresi sonuç vermezse genel aramaya düş (Fallback)
-    let rawResults = response.data.results;
+    let rawResults = [];
+
+    // 1. Öncelik: Doğrudan yazar adı araması (Yazara özel arama)
+    try {
+      const authorSearchUrl = `https://api.openalex.org/works?filter=author.display_name.search:${encodeURIComponent(query)}`;
+      const authorResponse = await axios.get(authorSearchUrl);
+      if (authorResponse.data && authorResponse.data.results) {
+        rawResults = authorResponse.data.results;
+      }
+    } catch (e) {
+      console.log('Yazar filtresi eslesmedi, genel aramaya geciliyor...');
+    }
+
+    // 2. Öncelik: Yazar filtresi boş dönerse genel kelime araması
     if (!rawResults || rawResults.length === 0) {
-      const fallbackResponse = await axios.get(`https://api.openalex.org/works?search=${encodeURIComponent(query)}`);
-      rawResults = fallbackResponse.data.results;
+      const generalSearchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}`;
+      const generalResponse = await axios.get(generalSearchUrl);
+      if (generalResponse.data && generalResponse.data.results) {
+        rawResults = generalResponse.data.results;
+      }
     }
 
     const results = rawResults.map(item => {
@@ -44,7 +56,7 @@ app.get('/api/search', async (req, res) => {
 
     res.json({ results });
   } catch (error) {
-    console.error(error);
+    console.error('API Error:', error.message);
     res.status(500).json({ error: 'Sunucu hatası oluştu.' });
   }
 });
