@@ -11,7 +11,7 @@ function App() {
     if (!query) return;
     setLoading(true);
     try {
-      const response = await fetch('[https://akademik-search.onrender.com/api/search?q=](https://akademik-search.onrender.com/api/search?q=)' + encodeURIComponent(query));}`);
+      const response = await fetch('https://akademik-search.onrender.com/api/search?q=' + encodeURIComponent(query));
       const data = await response.json();
       setResults(data.results || []);
     } catch (err) {
@@ -38,54 +38,48 @@ function App() {
           </button>
         </form>
 
-        <div>
-          {results.map((item, index) => (
-            <div key={index} style={{ border: '1px solid #eee', padding: '15px', borderRadius: '8px', marginBottom: '10px', background: '#fff' }}>
-              <h3 style={{ margin: '0 0 5px 0' }}>
-                <a href={item.doi || item.id} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', textDecoration: 'none' }}>
-                  {item.title}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {results.map((item) => (
+            <div key={item.id} style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', background: '#f9fafb' }}>
+              <h3 style={{ margin: '0 0 8px 0', color: '#1f2937' }}>{item.title}</h3>
+              <p style={{ margin: '0 0 8px 0', color: '#6b7280', fontSize: '14px' }}>
+                Yıl: {item.publication_year || 'Belirtilmedi'}
+              </p>
+              {item.doi && (
+                <a href={item.doi} target="_blank" rel="noopener noreferrer" style={{ color: '#4f46e5', fontSize: '14px', textDecoration: 'none' }}>
+                  Makaleye Git (DOI) →
                 </a>
-              </h3>
-              <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>Yayın Yılı: {item.publication_year}</p>
+              )}
             </div>
           ))}
         </div>
       </main>
 
-      {/* FOOTER & YASAL SAYFALAR */}
-      <footer style={{ borderTop: '1px solid #eee', padding: '20px', textAlign: 'center', background: '#f9fafb', fontSize: '14px' }}>
+      <footer style={{ padding: '20px', textAlign: 'center', borderTop: '1px solid #eee', color: '#6b7280', fontSize: '14px' }}>
         <p>© 2026 akademiksearch.com.tr - Tüm Hakları Saklıdır.</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', marginTop: '10px' }}>
-          <button onClick={() => setActiveModal('about')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Hakkımızda</button> |
-          <button onClick={() => setActiveModal('privacy')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Gizlilik Politikası</button> |
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px' }}>
+          <button onClick={() => setActiveModal('about')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Hakkımızda</button>
+          <span>|</span>
+          <button onClick={() => setActiveModal('privacy')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>Gizlilik Politikası</button>
+          <span>|</span>
           <button onClick={() => setActiveModal('contact')} style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer' }}>İletişim</button>
         </div>
       </footer>
 
-      {/* MODAL PENCERELERİ */}
       {activeModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: '#fff', padding: '30px', borderRadius: '8px', maxWidth: '600px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
-            {activeModal === 'about' && (
-              <>
-                <h2>Hakkımızda</h2>
-                <p>Akademik Search, dünya genelindeki bilimsel yayınlara, akademik makalelere ve araştırmalara hızlı erişim sağlamak amacıyla geliştirilmiş açık bir arama motorudur. Verilerimiz OpenAlex altyapısıyla anlık olarak sunulmaktadır.</p>
-              </>
-            )}
-            {activeModal === 'privacy' && (
-              <>
-                <h2>Gizlilik Politikası</h2>
-                <p>akademiksearch.com.tr üzerinde kullanıcıların kişisel verileri saklanmaz. Sitemiz üçüncü taraf reklam sağlayıcıları (Google AdSense gibi) aracılığıyla çerezler kullanabilir.</p>
-              </>
-            )}
-            {activeModal === 'contact' && (
-              <>
-                <h2>İletişim</h2>
-                <p>Görüş, öneri ve işbirliği talepleriniz için bizimle iletişime geçebilirsiniz:</p>
-                <p><strong>E-posta:</strong> info@akademiksearch.com.tr</p>
-              </>
-            )}
-            <button onClick={() => setActiveModal(null)} style={{ marginTop: '20px', padding: '8px 16px', background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Kapat</button>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div style={{ background: '#fff', padding: '25px', borderRadius: '8px', maxWidth: '500px', width: '90%' }}>
+            {activeModal === 'about' && <h2>Hakkımızda</h2>}
+            {activeModal === 'privacy' && <h2>Gizlilik Politikası</h2>}
+            {activeModal === 'contact' && <h2>İletişim</h2>}
+            <p style={{ marginTop: '15px', color: '#4b5563' }}>
+              {activeModal === 'about' && 'Akademik Search, açık erişimli akademik yayınları taramanızı sağlayan yerli bir arama motorudur.'}
+              {activeModal === 'privacy' && 'Sitemizde kullanıcı gizliliği esastır. Çerezler yalnızca kullanıcı deneyimini iyileştirmek ve AdSense hizmetleri için kullanılır.'}
+              {activeModal === 'contact' && 'Bize info@akademiksearch.com.tr adresinden ulaşabilirsiniz.'}
+            </p>
+            <button onClick={() => setActiveModal(null)} style={{ marginTop: '15px', padding: '8px 16px', background: '#374151', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              Kapat
+            </button>
           </div>
         </div>
       )}
