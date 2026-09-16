@@ -1,13 +1,21 @@
 ﻿{
-  "background_color": "#ffffff",
-  "dir": "ltr",
-  "display": "standalone",
-  "name": "Akademik Search - Academic Search Engine",
-  "orientation": "any",
-  "scope": "/",
   "short_name": "AkademikSearch",
-  "start_url": "/",
-  "theme_color": "#4f46e5",
+  "name": "Akademik Search - Academic Search Engine",
   "description": "Türkiye ve dünya genelinde akademik makale ve yazar arama motoru.",
-  "id": "com.akademiksearch.app"
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#ffffff"
 }
