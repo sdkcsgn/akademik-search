@@ -1,0 +1,13 @@
+﻿{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Akademik Search - Academic Search Engine",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "AkademikSearch",
+  "start_url": "/",
+  "theme_color": "#4f46e5",
+  "description": "Türkiye ve dünya genelinde akademik makale ve yazar arama motoru.",
+  "id": "com.akademiksearch.app"
+}
