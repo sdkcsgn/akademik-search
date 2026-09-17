@@ -8,16 +8,20 @@ function App() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!query) return;
+    if (!query.trim()) return;
     setLoading(true);
+    setResults([]);
     try {
-      const response = await fetch('https://akademik-search.onrender.com/api/search?q=' + encodeURIComponent(query));
+      const response = await fetch(`https://akademik-search.onrender.com/api/search?q=${encodeURIComponent(query)}`);
+      if (!response.ok) throw new Error('Sunucu yanıt vermedi');
       const data = await response.json();
       setResults(data.results || []);
     } catch (err) {
-      console.error(err);
+      console.error("Arama hatası:", err);
+      alert("Arama yapılırken bir hata oluştu. Lütfen tekrar deneyin.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
