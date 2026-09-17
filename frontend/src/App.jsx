@@ -40,7 +40,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main style={{ flex: 1, maxWidth: '900px', width: '100%', margin: '0 auto', padding: '40px 20px 20px', boxSizing: 'border-box' }}>
+<main style={{ flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '40px 20px 20px', boxSizing: 'border-box' }}>
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
           <input
             type="text"

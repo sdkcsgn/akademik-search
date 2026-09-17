@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.akademiksearch.twa",
+    "sha256_cert_fingerprints": [
+      "ÇIKTI_ALINAN_SHA256_PARMAK_ÝZÝ_BURAYA"
+    ]
+  }
+}]
