@@ -40,25 +40,25 @@ function App() {
       </header>
 
       {/* Main Content */}
-<main style={{ flex: 1, maxWidth: '1200px', width: '100%', margin: '0 auto', padding: '40px 20px 20px', boxSizing: 'border-box' }}>
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Akademik makale veya yazar adı arayın..."
-            style={{ 
-              flex: 1, 
-              padding: '14px 18px', 
-              fontSize: '16px', 
-              border: '1px solid #cbd5e1', 
-              borderRadius: '10px', 
-              outline: 'none',
-              backgroundColor: '#ffffff', 
-              color: '#0f172a',
-              WebkitTextFillColor: '#0f172a'
-            }}
-          />
+<main style={{ 
+  flex: 1, 
+  width: '100%', 
+  maxWidth: '100%', 
+  margin: '0 auto', 
+  padding: '20px', 
+  boxSizing: 'border-box' 
+}}>
+  <div style={{
+    width: '100%',
+    minHeight: '80vh',
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '30px',
+    border: '3px solid #2563eb',
+    boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.2)',
+    boxSizing: 'border-box'
+  }}>
+    <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '30px', maxWidth: '100%' }}>
           <button
             type="submit"
             style={{
