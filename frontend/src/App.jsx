@@ -1,5 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react';
 
+// Türkçe karakterleri doğru şekilde küçük harfe çeviren fonksiyon
+const toLowerTR = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'ı')
+    .toLowerCase();
+};
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -37,7 +46,8 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim().toLowerCase();
+      // Türkçe küçük harf dönüşümü yapıyoruz
+      const cleanQuery = toLowerTR(searchTerm.trim());
       const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
       // 1. Yazar Araması (OpenAlex Authors API)
@@ -48,28 +58,41 @@ function App() {
 
       let authorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        // İsimdeki tüm kelimeleri içeren yazar profillerini bul
+        // İsimdeki kelimeleri içeren ilk yazar profilini alıyoruz
         const matchedAuthor = authorData.results.find((author) => {
-          const name = author.display_name ? author.display_name.toLowerCase() : '';
+          const name = author.display_name ? toLowerTR(author.display_name) : '';
           return parts.every((part) => name.includes(part));
         }) || authorData.results[0];
 
-        const worksRes = await fetch(
-          `https://api.openalex.org/works?filter=author.id:${matchedAuthor.id}&per-page=100`
-        );
-        const worksData = await worksRes.json();
-        authorWorks = worksData.results || [];
+        if (matchedAuthor && matchedAuthor.id) {
+          const worksRes = await fetch(
+            `https://api.openalex.org/works?filter=author.id:${matchedAuthor.id}&per-page=100`
+          );
+          const worksData = await worksRes.json();
+          authorWorks = worksData.results || [];
+        }
       }
 
-      // 2. Genel Makale ve Başlık Araması (OpenAlex Works API)
+      // 2. Genel Makale ve Başlık Araması (Tırnaksız, esnek arama)
       const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"&per-page=100`
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
       const generalWorksData = await generalWorksRes.json();
-      const generalWorks = generalWorksData.results || [];
+      const rawGeneralWorks = generalWorksData.results || [];
 
-      // 3. İki arama sonucunu birleştir ve mükerrerleri temizle
-      const combined = [...authorWorks, ...generalWorks];
+      // Aratılan kelimelerin tümünün geçtiği sonuçları filtreliyoruz
+      const filteredGeneralWorks = rawGeneralWorks.filter(work => {
+        const titleText = work.title ? toLowerTR(work.title) : '';
+        const authorsText = (work.authorships || [])
+          .map(a => (a.author?.display_name ? toLowerTR(a.author.display_name) : ''))
+          .join(' ');
+        
+        const fullContent = titleText + ' ' + authorsText;
+        return parts.every(part => fullContent.includes(part));
+      });
+
+      // 3. Sonuçları birleştirip mükerrer kayıtları temizleme
+      const combined = [...authorWorks, ...filteredGeneralWorks];
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
