@@ -39,14 +39,23 @@ function App() {
 
     try {
       const cleanQuery = searchTerm.trim();
-      const targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=info@akademiksearch.com.tr`;
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      const userMail = 'info@akademiksearch.com.tr';
+      const targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=25&mailto=${userMail}`;
 
-      const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Servis yanıt vermedi.');
+      // En kararlı doğrudan istek ve hata koruması
+      const response = await fetch(targetUrl);
+      
+      if (response.status === 429) {
+        setErrorMessage('İstek sınırına ulaşıldı. Lütfen Google Scholar seçeneğini kullanın.');
+        setLoading(false);
+        return;
+      }
 
-      const proxyData = await res.json();
-      const data = JSON.parse(proxyData.contents);
+      if (!response.ok) {
+        throw new Error(`Bağlantı hatası: ${response.status}`);
+      }
+
+      const data = await response.json();
       const fetchedWorks = data.results || [];
 
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
@@ -76,14 +85,13 @@ function App() {
 
     try {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
-      const targetUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`;
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      const userMail = 'info@akademiksearch.com.tr';
+      const targetUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=25&mailto=${userMail}`;
+      
+      const response = await fetch(targetUrl);
+      if (!response.ok) throw new Error('Atıflar yüklenemedi.');
 
-      const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Atıflar alınamadı.');
-
-      const proxyData = await res.json();
-      const data = JSON.parse(proxyData.contents);
+      const data = await response.json();
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
 
@@ -126,7 +134,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
+            placeholder="Makale, yazar adı veya konu girin..."
             style={{
               flex: 1,
               padding: '12px 16px',
