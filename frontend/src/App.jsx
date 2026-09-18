@@ -30,46 +30,56 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim();
+      const cleanQuery = searchTerm.trim().toLowerCase();
       const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
-      // 1. İsim varyasyonlarını genişletiyoruz (Ör: "Emrah Koparan", "Koparan, Emrah", "E Koparan")
-      let queries = [cleanQuery];
-      if (parts.length >= 2) {
-        const lastName = parts[parts.length - 1];
-        const firstName = parts[0];
-        queries.push(`${lastName} ${firstName}`);
-        queries.push(`${firstName[0]} ${lastName}`);
-        queries.push(lastName); // Soyada göre de geniş arama
+      // 1. Doğrudan Yazar Kimliği (Author ID) Tespiti
+      const authorRes = await fetch(
+        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
+      );
+      const authorData = await authorRes.json();
+
+      let authorWorks = [];
+      if (authorData.results && authorData.results.length > 0) {
+        // İsmi aranan kelimelerin tümünü içeren yazarları buluyoruz
+        const matchedAuthors = authorData.results.filter(author => {
+          const name = (author.display_name || '').toLowerCase();
+          return parts.every(part => name.includes(part));
+        });
+
+        const targetAuthors = matchedAuthors.length > 0 ? matchedAuthors : [authorData.results[0]];
+
+        const worksPromises = targetAuthors.slice(0, 3).map(author =>
+          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
+            .then(res => res.json())
+            .then(data => data.results || [])
+            .catch(() => [])
+        );
+        const worksArrays = await Promise.all(worksPromises);
+        authorWorks = worksArrays.flat();
       }
 
-      // 2. OpenAlex Works API üzerinde tüm bu varyasyonları paralel aratıyoruz
-      const fetchPromises = queries.map(q =>
-        fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=100`)
-          .then(res => res.json())
-          .then(data => data.results || [])
-          .catch(() => [])
+      // 2. Genel Metin Araması
+      const generalWorksRes = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
+      const generalWorksData = await generalWorksRes.json();
+      const rawGeneralWorks = generalWorksData.results || [];
 
-      const allWorksArrays = await Promise.all(fetchPromises);
-      const rawWorks = allWorksArrays.flat();
-
-      // 3. Aratılan ismin makale yazarları veya başlıkları içinde geçip geçmediğini filtreliyoruz
-      const filteredWorks = rawWorks.filter(work => {
+      // SADECE aratılan TÜM kelimeleri içeren makaleleri tutuyoruz (Alakasız kelime eşleşmelerini önler)
+      const filteredGeneralWorks = rawGeneralWorks.filter(work => {
         const titleText = (work.title || '').toLowerCase();
         const authorsText = (work.authorships || [])
           .map(a => (a.author?.display_name || '').toLowerCase())
           .join(' ');
-
-        const searchParts = parts.map(p => p.toLowerCase());
         
-        // Soyisim mutlaka yazarlarda veya başlıkta geçmeli
-        const lastNameMatch = searchParts.some(p => authorsText.includes(p) || titleText.includes(p));
-        return lastNameMatch;
+        const fullText = titleText + ' ' + authorsText;
+        return parts.every(part => fullText.includes(part));
       });
 
-      // Mükerrer olanları ID'ye göre temizliyoruz
-      const uniqueResults = Array.from(new Map(filteredWorks.map(item => [item.id, item])).values());
+      // Mükerrer Kayıtları Temizleme
+      const combined = [...authorWorks, ...filteredGeneralWorks];
+      const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
       setResults(uniqueResults);
 
@@ -125,31 +135,35 @@ function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px' }}>
-      <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#0f172a' }}>Türkiye Odaklı Akademik Arama Motoru</h1>
-        <p style={{ color: '#475569' }}>Milyonlarca akademik makale ve yazar arasında arama yapın</p>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '15px', boxSizing: 'border-box' }}>
+      <header style={{ textAlign: 'center', marginBottom: '25px', padding: '0 10px' }}>
+        <h1 style={{ color: '#0f172a', fontSize: '24px', lineHeight: '1.3', margin: '0 0 8px 0', fontWeight: '700' }}>
+          Türkiye Odaklı Akademik Arama Motoru
+        </h1>
+        <p style={{ color: '#475569', fontSize: '14px', margin: 0 }}>
+          Milyonlarca akademik makale ve yazar arasında arama yapın
+        </p>
       </header>
 
       <main style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <form onSubmit={handleFormSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <form onSubmit={handleFormSubmit} style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
-            style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px' }}
+            placeholder="Makale veya yazar adı girin..."
+            style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px', outline: 'none' }}
           />
           <button
             type="submit"
-            style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '12px 24px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+            style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '12px 18px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', whiteSpace: 'nowrap' }}
           >
-            {loading ? 'Aranıyor...' : 'Ara'}
+            {loading ? '...' : 'Ara'}
           </button>
         </form>
 
         {searchTitle && results.length > 0 && (
-          <p style={{ color: '#64748b', marginBottom: '15px' }}>
+          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '15px' }}>
             {searchTitle} — Toplam <strong>{results.length}</strong> sonuç bulundu.
           </p>
         )}
@@ -175,12 +189,12 @@ function App() {
               const scholarUrl = `https://scholar.google.com/scholar?q=${encodeURIComponent(item.title)}`;
 
               return (
-                <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                  <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>
+                <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                  <h3 style={{ margin: '0 0 10px', fontSize: '16px', color: '#1e293b', lineHeight: '1.4' }}>
                     {item.title || 'Başlıksız Yayın'}
                   </h3>
 
-                  <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#475569' }}>
+                  <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#475569' }}>
                     <strong>Yazarlar: </strong>
                     {item.authorships && item.authorships.length > 0
                       ? item.authorships.map((a, index) => (
@@ -198,7 +212,7 @@ function App() {
                   </p>
 
                   {journalName && (
-                    <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#64748b' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b' }}>
                       <strong>Kaynak / Dergi: </strong>
                       {journalUrl ? (
                         <a
@@ -215,14 +229,13 @@ function App() {
                     </p>
                   )}
 
-                  <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
                     
                     {item.cited_by_count > 0 ? (
                       <button
                         onClick={() => fetchCitations(item.id, item.title)}
                         style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', padding: 0, font: 'inherit', textDecoration: 'underline', fontWeight: '600' }}
-                        title="Bu makaleye atıf yapan yayınları gör"
                       >
                         📊 Atıf Sayısı: {item.cited_by_count} (Atıfları Gör →)
                       </button>
@@ -231,13 +244,13 @@ function App() {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '15px', marginTop: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
                     {articleUrl && (
                       <a
                         href={articleUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ color: '#4f46e5', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}
+                        style={{ color: '#4f46e5', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
                       >
                         📄 Makaleye Git / Oku →
                       </a>
@@ -246,7 +259,7 @@ function App() {
                       href={scholarUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#0284c7', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}
+                      style={{ color: '#0284c7', fontSize: '13px', fontWeight: '500', textDecoration: 'none' }}
                     >
                       🔍 Google Scholar'da Ara ↗
                     </a>
