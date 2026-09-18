@@ -23,7 +23,7 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Genel ve Genişletilmiş Arama İşlemi
+  // Genel ve Esnek Arama İşlemi
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
@@ -33,44 +33,65 @@ function App() {
 
     try {
       const cleanQuery = searchTerm.trim().toLowerCase();
-      const parts = cleanQuery.split(' ');
+      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
-      // 1. İlgili Tüm Yazar Profillerini Bulma
-      const authorRes = await fetch(
-        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
-      );
-      const authorData = await authorRes.json();
-
-      let allAuthorWorks = [];
-      if (authorData.results && authorData.results.length > 0) {
-        // İsimde aratılan kelimeleri barındıran TÜM yazar profillerini seçiyoruz
-        const matchedAuthors = authorData.results.filter((author) => {
-          const name = author.display_name ? author.display_name.toLowerCase() : '';
-          return parts.every((part) => name.includes(part));
-        });
-
-        // Bulunan tüm yazar profillerinin makalelerini paralel olarak çekiyoruz
-        const authorWorkPromises = matchedAuthors.slice(0, 5).map((author) =>
-          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
-            .then((res) => res.json())
-            .then((data) => data.results || [])
-            .catch(() => [])
-        );
-
-        const worksArrays = await Promise.all(authorWorkPromises);
-        allAuthorWorks = worksArrays.flat();
+      // 1. Arama İsim Varyasyonlarını Oluşturma (ör: Emrah Koparan -> E. Koparan / E Koparan)
+      let nameVariations = [cleanQuery];
+      if (parts.length >= 2) {
+        const firstNameInitial = parts[0][0];
+        const lastName = parts[parts.length - 1];
+        nameVariations.push(`${firstNameInitial}. ${lastName}`);
+        nameVariations.push(`${firstNameInitial} ${lastName}`);
       }
 
-      // 2. Genel Metin Arama (Farklı isim formatları veya tezler için fallback)
-      const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
+      // 2. Yazar Profillerini Arama
+      const authorPromises = nameVariations.map(varName =>
+        fetch(`https://api.openalex.org/authors?search=${encodeURIComponent(varName)}`)
+          .then(res => res.json())
+          .then(data => data.results || [])
+          .catch(() => [])
       );
-      const generalWorksData = await generalWorksRes.json();
-      const generalWorks = generalWorksData.results || [];
+      const authorResultsArrays = await Promise.all(authorPromises);
+      const allAuthors = authorResultsArrays.flat();
 
-      // Sonuçları birleştirip mükerrer olanları temizliyoruz
-      const combined = [...allAuthorWorks, ...generalWorks];
-      const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+      // İsimle uyuşan tüm Yazar ID'lerini toplama
+      const matchedAuthorIds = new Set();
+      allAuthors.forEach(author => {
+        const name = author.display_name ? author.display_name.toLowerCase() : '';
+        const isMatch = parts.every(part => name.includes(part)) ||
+                        (parts.length >= 2 && name.includes(parts[parts.length - 1]));
+        if (isMatch && author.id) {
+          matchedAuthorIds.add(author.id);
+        }
+      });
+
+      // 3. Yazar ID'lerine Ait Makaleleri Çekme
+      let authorWorks = [];
+      if (matchedAuthorIds.size > 0) {
+        const authorIdsArr = Array.from(matchedAuthorIds).slice(0, 5); // İlk 5 eşleşen yazar profili
+        const worksPromises = authorIdsArr.map(id =>
+          fetch(`https://api.openalex.org/works?filter=author.id:${id}&per-page=100`)
+            .then(res => res.json())
+            .then(data => data.results || [])
+            .catch(() => [])
+        );
+        const worksArrays = await Promise.all(worksPromises);
+        authorWorks = worksArrays.flat();
+      }
+
+      // 4. Varyasyonlara Göre Genel Metin/Başlık Aramaları
+      const textSearchPromises = nameVariations.map(varName =>
+        fetch(`https://api.openalex.org/works?search=${encodeURIComponent(varName)}&per-page=100`)
+          .then(res => res.json())
+          .then(data => data.results || [])
+          .catch(() => [])
+      );
+      const textSearchArrays = await Promise.all(textSearchPromises);
+      const generalWorks = textSearchArrays.flat();
+
+      // 5. Bütün Sonuçları Birleştirme ve Mükerrer Kayıtları Ayıklama
+      const combined = [...authorWorks, ...generalWorks];
+      const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
       setResults(uniqueResults);
 
