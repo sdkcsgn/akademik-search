@@ -22,14 +22,12 @@ function App() {
 
       let authorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        // Aratılan isimle (ad + soyad) tam eşleşen veya en yakın yazarı filtreliyoruz
         const exactAuthor = authorData.results.find((author) => {
           const name = author.display_name ? author.display_name.toLowerCase() : '';
           const parts = cleanQuery.split(' ');
           return parts.every((part) => name.includes(part));
         }) || authorData.results[0];
 
-        // Eğer eşleşen yazarın ismi aratılan kelimeleri içeriyorsa makalelerini getir
         const authorNameLower = exactAuthor.display_name ? exactAuthor.display_name.toLowerCase() : '';
         const searchParts = cleanQuery.split(' ');
         const isMatch = searchParts.every((part) => authorNameLower.includes(part));
@@ -43,14 +41,13 @@ function App() {
         }
       }
 
-      // 2. Genel Makale Araması (Tam kelime grubu araması)
+      // 2. Genel Makale Araması
       const generalWorksRes = await fetch(
         `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"`
       );
       const generalWorksData = await generalWorksRes.json();
       const generalWorks = generalWorksData.results || [];
 
-      // Sonuçları birleştir ve mükerrerleri süz
       const combined = [...authorWorks, ...generalWorks];
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
@@ -75,7 +72,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar adı (ör: Sevcan Yıldız) veya konu girin..."
+            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
             style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px' }}
           />
           <button
