@@ -10,9 +10,9 @@ function App() {
     if (!query) return;
     setLoading(true);
     try {
-      // OpenAlex API: Türkçe dil filtresi ve tam arama mantığı
+      // Hem yazar hem başlık aramalarında en doğru eşleşmeyi almak için genel search parametresi
       const response = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(query)}&filter=language:tr`
+        `https://api.openalex.org/works?search=${encodeURIComponent(query)}&sort=relevance_score:desc`
       );
       const data = await response.json();
       setResults(data.results || []);
@@ -36,7 +36,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar veya konu ara..."
+            placeholder="Makale, yazar (ör: Emrah Koparan) veya konu ara..."
             style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px' }}
           />
           <button
@@ -64,6 +64,11 @@ function App() {
                     ? item.authorships.map(a => a.author.display_name).join(', ')
                     : 'Bilinmiyor'}
                 </p>
+                {item.primary_location && item.primary_location.source && (
+                  <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#64748b' }}>
+                    <strong>Dergiler/Kaynak: </strong>{item.primary_location.source.display_name}
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap' }}>
                   <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
                   <span>📊 Atıf Sayısı: {item.cited_by_count}</span>
