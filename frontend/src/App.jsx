@@ -29,20 +29,35 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const fetchWithProxy = async (targetUrl) => {
-    // 1. Doğrudan Deneme
+  // Garanti Veri Çekme Fonksiyonu (Yedek Hat Katmanlı)
+  const fetchOpenAlexData = async (targetUrl) => {
+    // YOL 1: Doğrudan API
     try {
       const res = await fetch(targetUrl);
-      if (res.ok) return await res.json();
+      if (res.ok) {
+        return await res.json();
+      }
     } catch (e) {
-      console.warn("Doğrudan istek başarısız, proxy deneniyor...");
+      console.warn('Doğrudan bağlantı başarısız, AllOrigins proxy deneniyor...');
     }
 
-    // 2. Proxy Yoluyla Deneme (429 engelini baypas eder)
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-    const proxyRes = await fetch(proxyUrl);
-    if (!proxyRes.ok) throw new Error(`API Hatası: ${proxyRes.status}`);
-    return await proxyRes.json();
+    // YOL 2: AllOrigins Proxy (Güvenilir JSON Geçidi)
+    try {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      const proxyRes = await fetch(proxyUrl);
+      if (proxyRes.ok) {
+        const proxyData = await proxyRes.json();
+        return JSON.parse(proxyData.contents);
+      }
+    } catch (e) {
+      console.warn('AllOrigins başarısız, CORSProxy deneniyor...');
+    }
+
+    // YOL 3: CorsProxy.io
+    const fallbackProxy = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    const fallbackRes = await fetch(fallbackProxy);
+    if (!fallbackRes.ok) throw new Error(`API Hatası: ${fallbackRes.status}`);
+    return await fallbackRes.json();
   };
 
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
@@ -58,7 +73,7 @@ function App() {
       const userMail = 'info@akademiksearch.com.tr';
       const targetApiUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=${userMail}`;
 
-      const data = await fetchWithProxy(targetApiUrl);
+      const data = await fetchOpenAlexData(targetApiUrl);
       const fetchedWorks = data.results || [];
 
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
@@ -72,7 +87,7 @@ function App() {
       }
     } catch (error) {
       console.error('Arama sırasında hata oluştu:', error);
-      setErrorMessage('OpenAlex sunucularına şu an ulaşılamıyor. Aşağıdaki buton ile Google Scholar üzerinde arama yapabilirsiniz.');
+      setErrorMessage('Arama servisleri şu an yanıt vermiyor. Lütfen Google Scholar seçeneğini kullanın.');
     } finally {
       setLoading(false);
     }
@@ -90,7 +105,7 @@ function App() {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
       const targetApiUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`;
 
-      const data = await fetchWithProxy(targetApiUrl);
+      const data = await fetchOpenAlexData(targetApiUrl);
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
 
