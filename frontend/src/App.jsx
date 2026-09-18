@@ -30,7 +30,7 @@ function App() {
   }, []);
 
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
-    if (!searchTerm.trim()) return;
+    if (!searchTerm.trim() || loading) return;
     setLoading(true);
     setResults([]);
     setErrorMessage('');
@@ -41,13 +41,12 @@ function App() {
       const cleanQuery = searchTerm.trim();
       const userMail = 'info@akademiksearch.com.tr';
 
-      // SADECE TEK İSTEK: Tek sorgu ile rate limit (429) riskini en aza indiriyoruz
       const response = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=50&mailto=${userMail}`
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=${userMail}`
       );
 
       if (response.status === 429) {
-        setErrorMessage('Çok fazla arama yapıldığı için istek sınırına ulaşıldı. Lütfen 10-15 saniye bekleyip tekrar deneyin.');
+        setErrorMessage('OpenAlex sunucuları geçici bir istek limiti uyguladı. Lütfen 10-15 saniye bekleyip tekrar deneyin.');
         setLoading(false);
         return;
       }
@@ -59,7 +58,6 @@ function App() {
       const data = await response.json();
       const fetchedWorks = data.results || [];
 
-      // Mükerrer kayıtları temizleme
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
@@ -79,6 +77,7 @@ function App() {
   };
 
   const fetchCitations = async (workId, articleTitle) => {
+    if (loading) return;
     setLoading(true);
     setResults([]);
     setErrorMessage('');
@@ -88,7 +87,7 @@ function App() {
     try {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
       const response = await fetch(
-        `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=50&mailto=info@akademiksearch.com.tr`
+        `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`
       );
 
       if (response.status === 429) {
@@ -154,7 +153,17 @@ function App() {
           />
           <button
             type="submit"
-            style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '12px 18px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', whiteSpace: 'nowrap' }}
+            disabled={loading}
+            style={{
+              backgroundColor: loading ? '#94a3b8' : '#4f46e5',
+              color: '#ffffff',
+              padding: '12px 18px',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              whiteSpace: 'nowrap'
+            }}
           >
             {loading ? 'Aranıyor...' : 'Ara'}
           </button>
