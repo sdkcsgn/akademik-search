@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 
 function App() {
   const [query, setQuery] = useState('');
@@ -6,12 +6,30 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
+  // Tarayıcı ve Telefon Geri / İleri Tuşlarını Dinleme
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state) {
+        setQuery(event.state.query || '');
+        setResults(event.state.results || []);
+        setSearchTitle(event.state.searchTitle || '');
+      } else {
+        setResults([]);
+        setSearchTitle('');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Genel Arama İşlemi
-  const executeSearch = async (searchTerm) => {
+  const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
     setResults([]);
-    setSearchTitle(`"${searchTerm}" için sonuçlar`);
+    const title = `"${searchTerm}" için sonuçlar`;
+    setSearchTitle(title);
 
     try {
       const cleanQuery = searchTerm.trim().toLowerCase();
@@ -54,6 +72,15 @@ function App() {
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
+
+      // Geçmişe Kaydet (Geri Tuşu Çalışması İçin)
+      if (!isHistoryNavigation) {
+        window.history.pushState(
+          { query: searchTerm, results: uniqueResults, searchTitle: title },
+          '',
+          window.location.href
+        );
+      }
     } catch (error) {
       console.error('Arama hatası:', error);
     } finally {
@@ -65,16 +92,24 @@ function App() {
   const fetchCitations = async (workId, articleTitle) => {
     setLoading(true);
     setResults([]);
-    setSearchTitle(`"${articleTitle}" makalesine atıf yapan çalışmalar`);
+    const title = `"${articleTitle}" makalesine atıf yapan çalışmalar`;
+    setSearchTitle(title);
 
     try {
-      // OpenAlex API: cited_by filtresi ile ilgili makaleyi referans gösteren yayınları çekiyoruz
       const cleanWorkId = workId.replace('https://openalex.org/', '');
       const response = await fetch(
         `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=100`
       );
       const data = await response.json();
-      setResults(data.results || []);
+      const fetchedResults = data.results || [];
+      setResults(fetchedResults);
+
+      // Geçmişe Kaydet
+      window.history.pushState(
+        { query, results: fetchedResults, searchTitle: title },
+        '',
+        window.location.href
+      );
     } catch (error) {
       console.error('Atıf listesi çekilemedi:', error);
     } finally {
@@ -178,7 +213,6 @@ function App() {
                   <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap', alignItems: 'center' }}>
                     <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
                     
-                    {/* Tıklanabilir Atıf Sayısı */}
                     {item.cited_by_count > 0 ? (
                       <button
                         onClick={() => fetchCitations(item.id, item.title)}
