@@ -37,17 +37,45 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim();
+      const cleanQuery = searchTerm.trim().toLowerCase();
+      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
-      // Doğrudan OpenAlex Works API araması (Hem başlık hem yazar metinlerini kapsar)
-      const res = await fetch(
+      // 1. Yazar Araması: OpenAlex Authors API'den ID tespiti
+      const authorRes = await fetch(
+        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
+      );
+      const authorData = await authorRes.json();
+
+      let authorWorks = [];
+      if (authorData.results && authorData.results.length > 0) {
+        // İsimdeki parçaları barındıran profilleri seç
+        const matchedAuthors = authorData.results.filter(a => {
+          const name = (a.display_name || '').toLowerCase();
+          return parts.some(p => name.includes(p));
+        });
+
+        const targetAuthors = matchedAuthors.length > 0 ? matchedAuthors.slice(0, 3) : [authorData.results[0]];
+
+        const worksPromises = targetAuthors.map(author =>
+          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
+            .then(res => res.json())
+            .then(d => d.results || [])
+            .catch(() => [])
+        );
+        const worksArrays = await Promise.all(worksPromises);
+        authorWorks = worksArrays.flat();
+      }
+
+      // 2. Metin Araması: OpenAlex Works API genel sorgusu
+      const worksRes = await fetch(
         `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
-      const data = await res.json();
-      const fetchedWorks = data.results || [];
+      const worksData = await worksRes.json();
+      const generalWorks = worksData.results || [];
 
-      // Mükerrerleri temizleme
-      const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
+      // 3. İki arama sonucunu harmanlama ve mükerrerleri ayıklama
+      const combined = [...authorWorks, ...generalWorks];
+      const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
 
