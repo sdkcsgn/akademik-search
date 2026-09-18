@@ -6,7 +6,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
-  // Geri / İleri Tuşu Dinleyicisi
+  // Geri / İleri Tuşlarını Dinleme
   useEffect(() => {
     if (!window.history.state) {
       window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
@@ -39,7 +39,14 @@ function App() {
     try {
       const cleanQuery = searchTerm.trim().toLowerCase();
 
-      // 1. Yazar Araması (OpenAlex Authors API)
+      // 1. Genel Makale ve Başlık Araması (OpenAlex Works API)
+      const worksRes = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
+      );
+      const worksData = await worksRes.json();
+      const generalWorks = worksData.results || [];
+
+      // 2. Yazar Araması (OpenAlex Authors API)
       const authorRes = await fetch(
         `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
       );
@@ -47,25 +54,18 @@ function App() {
 
       let authorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        // En uygun yazar profilini alıyoruz
-        const targetAuthor = authorData.results[0];
-        if (targetAuthor && targetAuthor.id) {
-          const worksRes = await fetch(
-            `https://api.openalex.org/works?filter=author.id:${targetAuthor.id}&per-page=100`
+        // En üstteki eşleşen yazarın makalelerini çek
+        const topAuthor = authorData.results[0];
+        if (topAuthor && topAuthor.id) {
+          const authorWorksRes = await fetch(
+            `https://api.openalex.org/works?filter=author.id:${topAuthor.id}&per-page=100`
           );
-          const worksData = await worksRes.json();
-          authorWorks = worksData.results || [];
+          const authorWorksData = await authorWorksRes.json();
+          authorWorks = authorWorksData.results || [];
         }
       }
 
-      // 2. Genel Metin ve Başlık Araması (OpenAlex Works API)
-      const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
-      );
-      const generalWorksData = await generalWorksRes.json();
-      const generalWorks = generalWorksData.results || [];
-
-      // 3. İki arama sonucunu birleştirip tekrarlayanları temizleme
+      // 3. Sonuçları birleştir, mükerrerleri sil
       const combined = [...authorWorks, ...generalWorks];
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
