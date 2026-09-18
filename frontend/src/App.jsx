@@ -6,7 +6,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
-  // Geri / İleri Tuşlarını Dinleme
+  // Geri / İleri Tuşu Dinleyicisi
   useEffect(() => {
     if (!window.history.state) {
       window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
@@ -37,37 +37,17 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim().toLowerCase();
+      const cleanQuery = searchTerm.trim();
 
-      // 1. Genel Makale ve Başlık Araması (OpenAlex Works API)
-      const worksRes = await fetch(
+      // Doğrudan OpenAlex Works API araması (Hem başlık hem yazar metinlerini kapsar)
+      const res = await fetch(
         `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
-      const worksData = await worksRes.json();
-      const generalWorks = worksData.results || [];
+      const data = await res.json();
+      const fetchedWorks = data.results || [];
 
-      // 2. Yazar Araması (OpenAlex Authors API)
-      const authorRes = await fetch(
-        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
-      );
-      const authorData = await authorRes.json();
-
-      let authorWorks = [];
-      if (authorData.results && authorData.results.length > 0) {
-        // En üstteki eşleşen yazarın makalelerini çek
-        const topAuthor = authorData.results[0];
-        if (topAuthor && topAuthor.id) {
-          const authorWorksRes = await fetch(
-            `https://api.openalex.org/works?filter=author.id:${topAuthor.id}&per-page=100`
-          );
-          const authorWorksData = await authorWorksRes.json();
-          authorWorks = authorWorksData.results || [];
-        }
-      }
-
-      // 3. Sonuçları birleştir, mükerrerleri sil
-      const combined = [...authorWorks, ...generalWorks];
-      const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+      // Mükerrerleri temizleme
+      const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
 
