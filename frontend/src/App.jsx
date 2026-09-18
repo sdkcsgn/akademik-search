@@ -40,13 +40,11 @@ function App() {
     try {
       const cleanQuery = searchTerm.trim();
       const targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=info@akademiksearch.com.tr`;
-      
-      // CORS ve 429 engeline takılmamak için AllOrigins Proxy kullanıyoruz
       const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-      
+
       const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Arama servisine ulaşılamadı.');
-      
+      if (!res.ok) throw new Error('Servis yanıt vermedi.');
+
       const proxyData = await res.json();
       const data = JSON.parse(proxyData.contents);
       const fetchedWorks = data.results || [];
@@ -62,7 +60,7 @@ function App() {
       }
     } catch (error) {
       console.error('Arama hatası:', error);
-      setErrorMessage('Arama servisleri geçici olarak yoğun. Google Scholar üzerinden devam edebilirsiniz.');
+      setErrorMessage('Arama servisine şu an ulaşılamıyor. Google Scholar üzerinden arama yapabilirsiniz.');
     } finally {
       setLoading(false);
     }
