@@ -6,7 +6,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
-  // Geri / İleri Tuşu Dinleyicisi
   useEffect(() => {
     if (!window.history.state) {
       window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
@@ -37,45 +36,44 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim().toLowerCase();
-      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
+      const cleanQuery = searchTerm.trim();
+      const userAgentMail = 'mailto:info@akademiksearch.com.tr';
 
-      // 1. Yazar Araması: OpenAlex Authors API'den ID tespiti
-      const authorRes = await fetch(
-        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
+      // OpenAlex Polite API Sorgusu (Doğrudan arama)
+      const response = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=50&mailto=${userAgentMail}`
       );
-      const authorData = await authorRes.json();
-
-      let authorWorks = [];
-      if (authorData.results && authorData.results.length > 0) {
-        // İsimdeki parçaları barındıran profilleri seç
-        const matchedAuthors = authorData.results.filter(a => {
-          const name = (a.display_name || '').toLowerCase();
-          return parts.some(p => name.includes(p));
-        });
-
-        const targetAuthors = matchedAuthors.length > 0 ? matchedAuthors.slice(0, 3) : [authorData.results[0]];
-
-        const worksPromises = targetAuthors.map(author =>
-          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
-            .then(res => res.json())
-            .then(d => d.results || [])
-            .catch(() => [])
-        );
-        const worksArrays = await Promise.all(worksPromises);
-        authorWorks = worksArrays.flat();
+      
+      if (!response.ok) {
+        throw new Error(`API Hatası: ${response.status}`);
       }
 
-      // 2. Metin Araması: OpenAlex Works API genel sorgusu
-      const worksRes = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
-      );
-      const worksData = await worksRes.json();
-      const generalWorks = worksData.results || [];
+      const data = await response.json();
+      let fetchedWorks = data.results || [];
 
-      // 3. İki arama sonucunu harmanlama ve mükerrerleri ayıklama
-      const combined = [...authorWorks, ...generalWorks];
-      const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
+      // Eğer doğrudan metin araması az sonuç verirse yazar ID'si ile takviye yap
+      if (fetchedWorks.length < 5) {
+        const authorResponse = await fetch(
+          `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}&mailto=${userAgentMail}`
+        );
+        if (authorResponse.ok) {
+          const authorData = await authorResponse.json();
+          if (authorData.results && authorData.results.length > 0) {
+            const authorId = authorData.results[0].id;
+            const authorWorksRes = await fetch(
+              `https://api.openalex.org/works?filter=author.id:${authorId}&per-page=50&mailto=${userAgentMail}`
+            );
+            if (authorWorksRes.ok) {
+              const authorWorksData = await authorWorksRes.json();
+              const additionalWorks = authorWorksData.results || [];
+              fetchedWorks = [...fetchedWorks, ...additionalWorks];
+            }
+          }
+        }
+      }
+
+      // Mükerrer olanları temizle
+      const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
 
@@ -86,7 +84,7 @@ function App() {
         );
       }
     } catch (error) {
-      console.error('Arama hatası:', error);
+      console.error('Arama sırasında hata oluştu:', error);
     } finally {
       setLoading(false);
     }
@@ -101,7 +99,7 @@ function App() {
     try {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
       const response = await fetch(
-        `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=100`
+        `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=50&mailto=info@akademiksearch.com.tr`
       );
       const data = await response.json();
       const fetchedResults = data.results || [];
@@ -162,7 +160,7 @@ function App() {
             type="submit"
             style={{ backgroundColor: '#4f46e5', color: '#ffffff', padding: '12px 18px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', whiteSpace: 'nowrap' }}
           >
-            {loading ? '...' : 'Ara'}
+            {loading ? 'Aranıyor...' : 'Ara'}
           </button>
         </form>
 
