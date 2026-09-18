@@ -37,11 +37,12 @@ function App() {
 
     try {
       const cleanQuery = searchTerm.trim();
-      const userAgentMail = 'mailto:info@akademiksearch.com.tr';
+      // Doğru mailto parametresi (ikinci mailto: eki kaldırıldı)
+      const userMail = 'info@akademiksearch.com.tr';
 
-      // OpenAlex Polite API Sorgusu (Doğrudan arama)
+      // 1. Doğrudan Metin Araması
       const response = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=50&mailto=${userAgentMail}`
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=50&mailto=${userMail}`
       );
       
       if (!response.ok) {
@@ -51,17 +52,17 @@ function App() {
       const data = await response.json();
       let fetchedWorks = data.results || [];
 
-      // Eğer doğrudan metin araması az sonuç verirse yazar ID'si ile takviye yap
+      // Eğer sonuç az gelirse yazar profilinden takviye yap
       if (fetchedWorks.length < 5) {
         const authorResponse = await fetch(
-          `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}&mailto=${userAgentMail}`
+          `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}&mailto=${userMail}`
         );
         if (authorResponse.ok) {
           const authorData = await authorResponse.json();
           if (authorData.results && authorData.results.length > 0) {
             const authorId = authorData.results[0].id;
             const authorWorksRes = await fetch(
-              `https://api.openalex.org/works?filter=author.id:${authorId}&per-page=50&mailto=${userAgentMail}`
+              `https://api.openalex.org/works?filter=author.id:${authorId}&per-page=50&mailto=${userMail}`
             );
             if (authorWorksRes.ok) {
               const authorWorksData = await authorWorksRes.json();
