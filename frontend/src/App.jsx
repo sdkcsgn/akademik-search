@@ -1,24 +1,13 @@
 ﻿import React, { useState, useEffect } from 'react';
 
-const normalizeText = (text) => {
-  if (!text) return '';
-  return text
-    .replace(/İ/g, 'i')
-    .replace(/I/g, 'ı')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-};
-
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
-  // Geri / İleri Tuşu İçin History Dinleyicisi
+  // Geri / İleri Tuşlarını Dinleme
   useEffect(() => {
-    // Sayfa ilk yüklendiğinde mevcut durumu geçmişe kaydediyoruz
     if (!window.history.state) {
       window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
     }
@@ -48,72 +37,40 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim();
-      const normQuery = normalizeText(cleanQuery);
-      const parts = normQuery.split(' ').filter(p => p.length > 0);
+      const cleanQuery = searchTerm.trim().toLowerCase();
+      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
-      let searchQueries = [cleanQuery];
-      if (parts.length >= 2) {
-        const firstNameInitial = parts[0][0];
-        const lastName = parts[parts.length - 1];
-        searchQueries.push(`${firstNameInitial}. ${lastName}`);
-        searchQueries.push(`${firstNameInitial} ${lastName}`);
-      }
-
-      const authorPromises = searchQueries.map(q =>
-        fetch(`https://api.openalex.org/authors?search=${encodeURIComponent(q)}`)
-          .then(res => res.json())
-          .then(data => data.results || [])
-          .catch(() => [])
+      // 1. Yazar Araması (OpenAlex Authors API)
+      const authorRes = await fetch(
+        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
       );
-      const authorResultsArrays = await Promise.all(authorPromises);
-      const allAuthors = authorResultsArrays.flat();
-
-      const matchedAuthorIds = new Set();
-      allAuthors.forEach(author => {
-        const normAuthorName = normalizeText(author.display_name);
-        const isMatch = parts.every(part => normAuthorName.includes(part)) ||
-                        (parts.length >= 2 && normAuthorName.includes(parts[parts.length - 1]));
-        if (isMatch && author.id) {
-          matchedAuthorIds.add(author.id);
-        }
-      });
+      const authorData = await authorRes.json();
 
       let authorWorks = [];
-      if (matchedAuthorIds.size > 0) {
-        const targetIds = Array.from(matchedAuthorIds).slice(0, 5);
-        const worksPromises = targetIds.map(id =>
-          fetch(`https://api.openalex.org/works?filter=author.id:${id}&per-page=100`)
-            .then(res => res.json())
-            .then(data => data.results || [])
-            .catch(() => [])
+      if (authorData.results && authorData.results.length > 0) {
+        // İsimdeki tüm kelimeleri içeren yazar profillerini bul
+        const matchedAuthor = authorData.results.find((author) => {
+          const name = author.display_name ? author.display_name.toLowerCase() : '';
+          return parts.every((part) => name.includes(part));
+        }) || authorData.results[0];
+
+        const worksRes = await fetch(
+          `https://api.openalex.org/works?filter=author.id:${matchedAuthor.id}&per-page=100`
         );
-        const worksArrays = await Promise.all(worksPromises);
-        authorWorks = worksArrays.flat();
+        const worksData = await worksRes.json();
+        authorWorks = worksData.results || [];
       }
 
-      const generalPromises = searchQueries.map(q =>
-        fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=100`)
-          .then(res => res.json())
-          .then(data => data.results || [])
-          .catch(() => [])
+      // 2. Genel Makale ve Başlık Araması (OpenAlex Works API)
+      const generalWorksRes = await fetch(
+        `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"&per-page=100`
       );
-      const generalArrays = await Promise.all(generalPromises);
-      const rawGeneralWorks = generalArrays.flat();
+      const generalWorksData = await generalWorksRes.json();
+      const generalWorks = generalWorksData.results || [];
 
-      const lastName = parts[parts.length - 1];
-      const filteredGeneralWorks = rawGeneralWorks.filter(work => {
-        const titleText = normalizeText(work.title);
-        const authorsText = (work.authorships || [])
-          .map(a => normalizeText(a.author?.display_name))
-          .join(' ');
-        
-        const fullContent = titleText + ' ' + authorsText;
-        return fullContent.includes(lastName);
-      });
-
-      const combined = [...authorWorks, ...filteredGeneralWorks];
-      const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
+      // 3. İki arama sonucunu birleştir ve mükerrerleri temizle
+      const combined = [...authorWorks, ...generalWorks];
+      const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
 
@@ -183,7 +140,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar adı (ör: Emrah Koparan, Sevcan Yıldız) veya konu girin..."
+            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -213,7 +170,7 @@ function App() {
         {results.length === 0 && !loading && query && (
           <div style={{ textAlign: 'center', marginTop: '30px', padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <p style={{ color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
-              OpenAlex veritabanında "<strong>{query}</strong>" için doğrudan sonuç bulunamadı.
+              Aramanızla eşleşen sonuç bulunamadı.
             </p>
             <a
               href={`https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`}
