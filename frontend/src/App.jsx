@@ -5,14 +5,14 @@ function App() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  // Arama işlemini yürüten ana fonksiyon
+  const executeSearch = async (searchTerm) => {
+    if (!searchTerm.trim()) return;
     setLoading(true);
     setResults([]);
 
     try {
-      const cleanQuery = query.trim().toLowerCase();
+      const cleanQuery = searchTerm.trim().toLowerCase();
       
       // 1. Yazar Araması
       const authorRes = await fetch(
@@ -33,7 +33,6 @@ function App() {
         const isMatch = searchParts.every((part) => authorNameLower.includes(part));
 
         if (isMatch) {
-          // per-page=100 parametresi ile yazarın 100 makalesini birden çekiyoruz
           const worksRes = await fetch(
             `https://api.openalex.org/works?filter=author.id:${exactAuthor.id}&per-page=100`
           );
@@ -42,7 +41,7 @@ function App() {
         }
       }
 
-      // 2. Genel Makale Araması (En fazla 100 sonuç)
+      // 2. Genel Makale Araması
       const generalWorksRes = await fetch(
         `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"&per-page=100`
       );
@@ -60,6 +59,17 @@ function App() {
     }
   };
 
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    executeSearch(query);
+  };
+
+  // Yazar ismine tıklandığında çalışacak fonksiyon
+  const handleAuthorClick = (authorName) => {
+    setQuery(authorName);
+    executeSearch(authorName);
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px' }}>
       <header style={{ textAlign: 'center', marginBottom: '30px' }}>
@@ -68,7 +78,7 @@ function App() {
       </header>
 
       <main style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <form onSubmit={handleFormSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           <input
             type="text"
             value={query}
@@ -106,7 +116,26 @@ function App() {
                 <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#475569' }}>
                   <strong>Yazarlar: </strong>
                   {item.authorships && item.authorships.length > 0
-                    ? item.authorships.map((a) => a.author.display_name).join(', ')
+                    ? item.authorships.map((a, index) => (
+                        <span key={index}>
+                          <button
+                            onClick={() => handleAuthorClick(a.author.display_name)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#4f46e5',
+                              cursor: 'pointer',
+                              padding: 0,
+                              font: 'inherit',
+                              textDecoration: 'underline',
+                              fontWeight: '500'
+                            }}
+                          >
+                            {a.author.display_name}
+                          </button>
+                          {index < item.authorships.length - 1 ? ', ' : ''}
+                        </span>
+                      ))
                     : 'Bilinmiyor'}
                 </p>
                 {item.primary_location && item.primary_location.source && (
