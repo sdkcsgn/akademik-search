@@ -20,9 +20,9 @@ export default async function handler(req, res) {
 
     if (workId) {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
-      targetUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=50&mailto=${userMail}`;
+      targetUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=25&mailto=${userMail}`;
     } else if (query) {
-      targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=50&mailto=${userMail}`;
+      targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=25&mailto=${userMail}`;
     } else {
       return res.status(400).json({ error: 'Aramak için query veya workId gereklidir.' });
     }
