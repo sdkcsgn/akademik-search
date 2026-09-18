@@ -1,11 +1,4 @@
-{
-  "name": "akademik-search",
-  "version": "1.0.0",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^2.6.9"
-  }
+"scripts": {
+  "start": "react-scripts start",
+  "build": "react-scripts build"
 }
