@@ -29,6 +29,22 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  const fetchWithProxy = async (targetUrl) => {
+    // 1. Doğrudan Deneme
+    try {
+      const res = await fetch(targetUrl);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      console.warn("Doğrudan istek başarısız, proxy deneniyor...");
+    }
+
+    // 2. Proxy Yoluyla Deneme (429 engelini baypas eder)
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+    const proxyRes = await fetch(proxyUrl);
+    if (!proxyRes.ok) throw new Error(`API Hatası: ${proxyRes.status}`);
+    return await proxyRes.json();
+  };
+
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
     if (!searchTerm.trim() || loading) return;
     setLoading(true);
@@ -40,26 +56,12 @@ function App() {
     try {
       const cleanQuery = searchTerm.trim();
       const userMail = 'info@akademiksearch.com.tr';
+      const targetApiUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=${userMail}`;
 
-      const response = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=${userMail}`
-      );
-
-      if (response.status === 429) {
-        setErrorMessage('OpenAlex sunucuları geçici bir istek limiti uyguladı. Lütfen 10-15 saniye bekleyip tekrar deneyin.');
-        setLoading(false);
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`API Hatası: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await fetchWithProxy(targetApiUrl);
       const fetchedWorks = data.results || [];
 
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
-
       setResults(uniqueResults);
 
       if (!isHistoryNavigation) {
@@ -70,7 +72,7 @@ function App() {
       }
     } catch (error) {
       console.error('Arama sırasında hata oluştu:', error);
-      setErrorMessage('Arama sırasında bir bağlantı hatası oluştu.');
+      setErrorMessage('OpenAlex sunucularına şu an ulaşılamıyor. Aşağıdaki buton ile Google Scholar üzerinde arama yapabilirsiniz.');
     } finally {
       setLoading(false);
     }
@@ -86,17 +88,9 @@ function App() {
 
     try {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
-      const response = await fetch(
-        `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`
-      );
+      const targetApiUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`;
 
-      if (response.status === 429) {
-        setErrorMessage('İstek sınırına ulaşıldı. Lütfen biraz bekleyip tekrar deneyin.');
-        setLoading(false);
-        return;
-      }
-
-      const data = await response.json();
+      const data = await fetchWithProxy(targetApiUrl);
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
 
@@ -106,6 +100,7 @@ function App() {
       );
     } catch (error) {
       console.error('Atıf listesi çekilemedi:', error);
+      setErrorMessage('Atıf verileri yüklenirken bir sorun oluştu.');
     } finally {
       setLoading(false);
     }
