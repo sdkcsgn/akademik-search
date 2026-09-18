@@ -41,7 +41,6 @@ function App() {
 
       let authorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        // İsmi aranan kelimelerin tümünü içeren yazarları buluyoruz
         const matchedAuthors = authorData.results.filter(author => {
           const name = (author.display_name || '').toLowerCase();
           return parts.every(part => name.includes(part));
@@ -66,7 +65,6 @@ function App() {
       const generalWorksData = await generalWorksRes.json();
       const rawGeneralWorks = generalWorksData.results || [];
 
-      // SADECE aratılan TÜM kelimeleri içeren makaleleri tutuyoruz (Alakasız kelime eşleşmelerini önler)
       const filteredGeneralWorks = rawGeneralWorks.filter(work => {
         const titleText = (work.title || '').toLowerCase();
         const authorsText = (work.authorships || [])
@@ -77,7 +75,6 @@ function App() {
         return parts.every(part => fullText.includes(part));
       });
 
-      // Mükerrer Kayıtları Temizleme
       const combined = [...authorWorks, ...filteredGeneralWorks];
       const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
@@ -151,8 +148,18 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale veya yazar adı girin..."
-            style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '15px', outline: 'none' }}
+            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              fontSize: '15px',
+              backgroundColor: '#ffffff', // Beyaz arka plan
+              color: '#0f172a', // Koyu renk yazı
+              outline: 'none',
+              WebkitAppearance: 'none' // Mobil varsayılan stilleri sıfırlama
+            }}
           />
           <button
             type="submit"
