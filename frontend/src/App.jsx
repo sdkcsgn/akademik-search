@@ -29,37 +29,6 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Garanti Veri Çekme Fonksiyonu (Yedek Hat Katmanlı)
-  const fetchOpenAlexData = async (targetUrl) => {
-    // YOL 1: Doğrudan API
-    try {
-      const res = await fetch(targetUrl);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch (e) {
-      console.warn('Doğrudan bağlantı başarısız, AllOrigins proxy deneniyor...');
-    }
-
-    // YOL 2: AllOrigins Proxy (Güvenilir JSON Geçidi)
-    try {
-      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-      const proxyRes = await fetch(proxyUrl);
-      if (proxyRes.ok) {
-        const proxyData = await proxyRes.json();
-        return JSON.parse(proxyData.contents);
-      }
-    } catch (e) {
-      console.warn('AllOrigins başarısız, CORSProxy deneniyor...');
-    }
-
-    // YOL 3: CorsProxy.io
-    const fallbackProxy = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-    const fallbackRes = await fetch(fallbackProxy);
-    if (!fallbackRes.ok) throw new Error(`API Hatası: ${fallbackRes.status}`);
-    return await fallbackRes.json();
-  };
-
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
     if (!searchTerm.trim() || loading) return;
     setLoading(true);
@@ -70,10 +39,16 @@ function App() {
 
     try {
       const cleanQuery = searchTerm.trim();
-      const userMail = 'info@akademiksearch.com.tr';
-      const targetApiUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=${userMail}`;
-
-      const data = await fetchOpenAlexData(targetApiUrl);
+      const targetUrl = `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=30&mailto=info@akademiksearch.com.tr`;
+      
+      // CORS ve 429 engeline takılmamak için AllOrigins Proxy kullanıyoruz
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+      
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Arama servisine ulaşılamadı.');
+      
+      const proxyData = await res.json();
+      const data = JSON.parse(proxyData.contents);
       const fetchedWorks = data.results || [];
 
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
@@ -86,8 +61,8 @@ function App() {
         );
       }
     } catch (error) {
-      console.error('Arama sırasında hata oluştu:', error);
-      setErrorMessage('Arama servisleri şu an yanıt vermiyor. Lütfen Google Scholar seçeneğini kullanın.');
+      console.error('Arama hatası:', error);
+      setErrorMessage('Arama servisleri geçici olarak yoğun. Google Scholar üzerinden devam edebilirsiniz.');
     } finally {
       setLoading(false);
     }
@@ -103,9 +78,14 @@ function App() {
 
     try {
       const cleanWorkId = workId.replace('https://openalex.org/', '');
-      const targetApiUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`;
+      const targetUrl = `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=30&mailto=info@akademiksearch.com.tr`;
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
 
-      const data = await fetchOpenAlexData(targetApiUrl);
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Atıflar alınamadı.');
+
+      const proxyData = await res.json();
+      const data = JSON.parse(proxyData.contents);
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
 
