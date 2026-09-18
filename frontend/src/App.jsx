@@ -1,21 +1,12 @@
 ﻿import React, { useState, useEffect } from 'react';
 
-// Türkçe karakterleri doğru şekilde küçük harfe çeviren fonksiyon
-const toLowerTR = (text) => {
-  if (!text) return '';
-  return text
-    .replace(/İ/g, 'i')
-    .replace(/I/g, 'ı')
-    .toLowerCase();
-};
-
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
-  // Geri / İleri Tuşlarını Dinleme
+  // Geri / İleri Tuşu Dinleyicisi
   useEffect(() => {
     if (!window.history.state) {
       window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
@@ -46,9 +37,7 @@ function App() {
     setSearchTitle(title);
 
     try {
-      // Türkçe küçük harf dönüşümü yapıyoruz
-      const cleanQuery = toLowerTR(searchTerm.trim());
-      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
+      const cleanQuery = searchTerm.trim().toLowerCase();
 
       // 1. Yazar Araması (OpenAlex Authors API)
       const authorRes = await fetch(
@@ -58,41 +47,26 @@ function App() {
 
       let authorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        // İsimdeki kelimeleri içeren ilk yazar profilini alıyoruz
-        const matchedAuthor = authorData.results.find((author) => {
-          const name = author.display_name ? toLowerTR(author.display_name) : '';
-          return parts.every((part) => name.includes(part));
-        }) || authorData.results[0];
-
-        if (matchedAuthor && matchedAuthor.id) {
+        // En uygun yazar profilini alıyoruz
+        const targetAuthor = authorData.results[0];
+        if (targetAuthor && targetAuthor.id) {
           const worksRes = await fetch(
-            `https://api.openalex.org/works?filter=author.id:${matchedAuthor.id}&per-page=100`
+            `https://api.openalex.org/works?filter=author.id:${targetAuthor.id}&per-page=100`
           );
           const worksData = await worksRes.json();
           authorWorks = worksData.results || [];
         }
       }
 
-      // 2. Genel Makale ve Başlık Araması (Tırnaksız, esnek arama)
+      // 2. Genel Metin ve Başlık Araması (OpenAlex Works API)
       const generalWorksRes = await fetch(
         `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
       const generalWorksData = await generalWorksRes.json();
-      const rawGeneralWorks = generalWorksData.results || [];
+      const generalWorks = generalWorksData.results || [];
 
-      // Aratılan kelimelerin tümünün geçtiği sonuçları filtreliyoruz
-      const filteredGeneralWorks = rawGeneralWorks.filter(work => {
-        const titleText = work.title ? toLowerTR(work.title) : '';
-        const authorsText = (work.authorships || [])
-          .map(a => (a.author?.display_name ? toLowerTR(a.author.display_name) : ''))
-          .join(' ');
-        
-        const fullContent = titleText + ' ' + authorsText;
-        return parts.every(part => fullContent.includes(part));
-      });
-
-      // 3. Sonuçları birleştirip mükerrer kayıtları temizleme
-      const combined = [...authorWorks, ...filteredGeneralWorks];
+      // 3. İki arama sonucunu birleştirip tekrarlayanları temizleme
+      const combined = [...authorWorks, ...generalWorks];
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
