@@ -84,14 +84,17 @@ function App() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {results.map((item) => (
+            {results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {results.map((item) => (
             <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
               <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>{item.title}</h3>
               <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#475569' }}>
-                ✍️ <strong>Yazarlar:</strong> {item.authors ? item.authors.join(', ') : 'Bilinmiyor'}
+                <strong>Yazarlar: </strong>{item.authors ? item.authors.join(', ') : 'Bilinmiyor'}
               </p>
               <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap' }}>
                 <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
-                <span>📖 Dergi/Konferans: {item.venue || 'Belirtilmedi'}</span>
+                <span>📚 Dergi/Konferans: {item.venue || 'Belirtilmedi'}</span>
                 <span>📊 Atıf Sayısı: {item.cited_by_count}</span>
               </div>
               {item.doi && (
@@ -99,11 +102,13 @@ function App() {
                   Makaleye Git (DOI) →
                 </a>
               )}
-      </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   </main>
 </div>
 );
 
 export default App;
-
