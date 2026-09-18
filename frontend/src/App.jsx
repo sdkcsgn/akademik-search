@@ -33,17 +33,18 @@ function App() {
         const isMatch = searchParts.every((part) => authorNameLower.includes(part));
 
         if (isMatch) {
+          // per-page=100 parametresi ile yazarın 100 makalesini birden çekiyoruz
           const worksRes = await fetch(
-            `https://api.openalex.org/works?filter=author.id:${exactAuthor.id}`
+            `https://api.openalex.org/works?filter=author.id:${exactAuthor.id}&per-page=100`
           );
           const worksData = await worksRes.json();
           authorWorks = worksData.results || [];
         }
       }
 
-      // 2. Genel Makale Araması
+      // 2. Genel Makale Araması (En fazla 100 sonuç)
       const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"`
+        `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"&per-page=100`
       );
       const generalWorksData = await generalWorksRes.json();
       const generalWorks = generalWorksData.results || [];
