@@ -23,7 +23,7 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Genel Arama İşlemi
+  // Genel ve Genişletilmiş Arama İşlemi
   const executeSearch = async (searchTerm, isHistoryNavigation = false) => {
     if (!searchTerm.trim()) return;
     setLoading(true);
@@ -33,42 +33,43 @@ function App() {
 
     try {
       const cleanQuery = searchTerm.trim().toLowerCase();
-      
-      // 1. Yazar Araması
+      const parts = cleanQuery.split(' ');
+
+      // 1. İlgili Tüm Yazar Profillerini Bulma
       const authorRes = await fetch(
         `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
       );
       const authorData = await authorRes.json();
 
-      let authorWorks = [];
+      let allAuthorWorks = [];
       if (authorData.results && authorData.results.length > 0) {
-        const exactAuthor = authorData.results.find((author) => {
+        // İsimde aratılan kelimeleri barındıran TÜM yazar profillerini seçiyoruz
+        const matchedAuthors = authorData.results.filter((author) => {
           const name = author.display_name ? author.display_name.toLowerCase() : '';
-          const parts = cleanQuery.split(' ');
           return parts.every((part) => name.includes(part));
-        }) || authorData.results[0];
+        });
 
-        const authorNameLower = exactAuthor.display_name ? exactAuthor.display_name.toLowerCase() : '';
-        const searchParts = cleanQuery.split(' ');
-        const isMatch = searchParts.every((part) => authorNameLower.includes(part));
+        // Bulunan tüm yazar profillerinin makalelerini paralel olarak çekiyoruz
+        const authorWorkPromises = matchedAuthors.slice(0, 5).map((author) =>
+          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
+            .then((res) => res.json())
+            .then((data) => data.results || [])
+            .catch(() => [])
+        );
 
-        if (isMatch) {
-          const worksRes = await fetch(
-            `https://api.openalex.org/works?filter=author.id:${exactAuthor.id}&per-page=100`
-          );
-          const worksData = await worksRes.json();
-          authorWorks = worksData.results || [];
-        }
+        const worksArrays = await Promise.all(authorWorkPromises);
+        allAuthorWorks = worksArrays.flat();
       }
 
-      // 2. Genel Makale Araması
+      // 2. Genel Metin Arama (Farklı isim formatları veya tezler için fallback)
       const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search="${encodeURIComponent(cleanQuery)}"&per-page=100`
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
       );
       const generalWorksData = await generalWorksRes.json();
       const generalWorks = generalWorksData.results || [];
 
-      const combined = [...authorWorks, ...generalWorks];
+      // Sonuçları birleştirip mükerrer olanları temizliyoruz
+      const combined = [...allAuthorWorks, ...generalWorks];
       const uniqueResults = Array.from(new Map(combined.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
@@ -167,14 +168,12 @@ function App() {
               const journalName = item.primary_location?.source?.display_name;
               const journalUrl = item.primary_location?.source?.landing_page_url || item.primary_location?.source?.id;
 
-              // En sağlıklı makale URL'sini belirliyoruz:
               const articleUrl = 
                 item.open_access?.oa_url || 
                 item.primary_location?.landing_page_url || 
                 item.primary_location?.pdf_url || 
                 item.doi;
 
-              // Alternatif olarak Google Scholar linki:
               const scholarUrl = `https://scholar.google.com/scholar?q=${encodeURIComponent(item.title)}`;
 
               return (
