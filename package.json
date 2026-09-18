@@ -2,7 +2,8 @@
   "name": "akademik-search",
   "version": "1.0.0",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "cd frontend && npm install && npm run build"
   },
   "dependencies": {
     "express": "^4.18.2",
