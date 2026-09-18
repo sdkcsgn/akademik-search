@@ -7,15 +7,43 @@ function App() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!query) return;
+    if (!query.trim()) return;
     setLoading(true);
+    setResults([]);
+
     try {
-      // Hem yazar hem başlık aramalarında en doğru eşleşmeyi almak için genel search parametresi
-      const response = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(query)}&sort=relevance_score:desc`
+      // 1. Arama kelimesini hem yazar hem de makale başlığı için sorguluyoruz
+      const cleanQuery = query.trim();
+      
+      // Yazar araması: Önce yazar adına göre sorguluyoruz
+      const authorRes = await fetch(
+        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
       );
-      const data = await response.json();
-      setResults(data.results || []);
+      const authorData = await authorRes.json();
+
+      let authorWorks = [];
+      if (authorData.results && authorData.results.length > 0) {
+        // İlk eşleşen yazarın ID'sini alıp makalelerini çekiyoruz
+        const topAuthor = authorData.results[0];
+        const worksRes = await fetch(
+          `https://api.openalex.org/works?filter=author.id:${topAuthor.id}`
+        );
+        const worksData = await worksRes.json();
+        authorWorks = worksData.results || [];
+      }
+
+      // Makale araması: Genel başlık/konu araması yapıyoruz
+      const generalWorksRes = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}`
+      );
+      const generalWorksData = await generalWorksRes.json();
+      const generalWorks = generalWorksData.results || [];
+
+      // Sonuçları birleştirip tekrarlayan kayıtları temizliyoruz (Öncelik Yazarın Kendi Makalelerinde)
+      const combined = [...authorWorks, ...generalWorks];
+      const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
+
+      setResults(uniqueResults);
     } catch (error) {
       console.error('Arama hatası:', error);
     } finally {
@@ -36,7 +64,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar (ör: Emrah Koparan) veya konu ara..."
+            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
             style={{ flex: 1, padding: '12px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '16px' }}
           />
           <button
@@ -47,31 +75,39 @@ function App() {
           </button>
         </form>
 
-        {results.length > 0 && (
+        {results.length > 0 ? (
           <p style={{ color: '#64748b', marginBottom: '15px' }}>
             Toplam <strong>{results.length}</strong> sonuç bulundu.
           </p>
+        ) : (
+          !loading && query && (
+            <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '20px' }}>
+              Aramanızla eşleşen sonuç bulunamadı.
+            </p>
+          )
         )}
 
         {results.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {results.map((item) => (
               <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>{item.title}</h3>
+                <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>
+                  {item.title || 'Başlıksız Yayın'}
+                </h3>
                 <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#475569' }}>
                   <strong>Yazarlar: </strong>
                   {item.authorships && item.authorships.length > 0
-                    ? item.authorships.map(a => a.author.display_name).join(', ')
+                    ? item.authorships.map((a) => a.author.display_name).join(', ')
                     : 'Bilinmiyor'}
                 </p>
                 {item.primary_location && item.primary_location.source && (
                   <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#64748b' }}>
-                    <strong>Dergiler/Kaynak: </strong>{item.primary_location.source.display_name}
+                    <strong>Kaynak / Dergi: </strong>{item.primary_location.source.display_name}
                   </p>
                 )}
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap' }}>
                   <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
-                  <span>📊 Atıf Sayısı: {item.cited_by_count}</span>
+                  <span>📊 Atıf Sayısı: {item.cited_by_count ?? 0}</span>
                 </div>
                 {item.doi && (
                   <a
