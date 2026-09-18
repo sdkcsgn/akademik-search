@@ -33,23 +33,42 @@ function App() {
       const cleanQuery = searchTerm.trim().toLowerCase();
       const parts = cleanQuery.split(' ').filter(p => p.length > 0);
 
-      // 1. Doğrudan Yazar Kimliği (Author ID) Tespiti
-      const authorRes = await fetch(
-        `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}`
+      // 1. İsim Varyasyonlarını Oluşturma (ör: Emrah Koparan -> E. Koparan ve E Koparan)
+      let searchQueries = [cleanQuery];
+      if (parts.length >= 2) {
+        const firstNameInitial = parts[0][0];
+        const lastName = parts[parts.length - 1];
+        searchQueries.push(`${firstNameInitial}. ${lastName}`);
+        searchQueries.push(`${firstNameInitial} ${lastName}`);
+      }
+
+      // 2. Yazar ID'lerini Bulma (Varyasyonlar İle)
+      const authorPromises = searchQueries.map(q =>
+        fetch(`https://api.openalex.org/authors?search=${encodeURIComponent(q)}`)
+          .then(res => res.json())
+          .then(data => data.results || [])
+          .catch(() => [])
       );
-      const authorData = await authorRes.json();
+      const authorResultsArrays = await Promise.all(authorPromises);
+      const allAuthors = authorResultsArrays.flat();
 
+      const matchedAuthorIds = new Set();
+      allAuthors.forEach(author => {
+        const name = (author.display_name || '').toLowerCase();
+        // Adın veya soyadın uyuşmasını kontrol et
+        const isMatch = parts.every(part => name.includes(part)) ||
+                        (parts.length >= 2 && name.includes(parts[parts.length - 1]));
+        if (isMatch && author.id) {
+          matchedAuthorIds.add(author.id);
+        }
+      });
+
+      // 3. Yazar ID'lerine Göre Makaleleri Çekme
       let authorWorks = [];
-      if (authorData.results && authorData.results.length > 0) {
-        const matchedAuthors = authorData.results.filter(author => {
-          const name = (author.display_name || '').toLowerCase();
-          return parts.every(part => name.includes(part));
-        });
-
-        const targetAuthors = matchedAuthors.length > 0 ? matchedAuthors : [authorData.results[0]];
-
-        const worksPromises = targetAuthors.slice(0, 3).map(author =>
-          fetch(`https://api.openalex.org/works?filter=author.id:${author.id}&per-page=100`)
+      if (matchedAuthorIds.size > 0) {
+        const targetIds = Array.from(matchedAuthorIds).slice(0, 5);
+        const worksPromises = targetIds.map(id =>
+          fetch(`https://api.openalex.org/works?filter=author.id:${id}&per-page=100`)
             .then(res => res.json())
             .then(data => data.results || [])
             .catch(() => [])
@@ -58,23 +77,28 @@ function App() {
         authorWorks = worksArrays.flat();
       }
 
-      // 2. Genel Metin Araması
-      const generalWorksRes = await fetch(
-        `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=100`
+      // 4. Varyasyonlara Göre Metin Araması Yapma
+      const generalPromises = searchQueries.map(q =>
+        fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=100`)
+          .then(res => res.json())
+          .then(data => data.results || [])
+          .catch(() => [])
       );
-      const generalWorksData = await generalWorksRes.json();
-      const rawGeneralWorks = generalWorksData.results || [];
+      const generalArrays = await Promise.all(generalPromises);
+      const rawGeneralWorks = generalArrays.flat();
 
+      // 5. Alakasız Sonuçları Filtreleme (En az soyisim geçmeli)
+      const lastName = parts[parts.length - 1];
       const filteredGeneralWorks = rawGeneralWorks.filter(work => {
         const titleText = (work.title || '').toLowerCase();
         const authorsText = (work.authorships || [])
           .map(a => (a.author?.display_name || '').toLowerCase())
           .join(' ');
         
-        const fullText = titleText + ' ' + authorsText;
-        return parts.every(part => fullText.includes(part));
+        return titleText.includes(lastName) || authorsText.includes(lastName);
       });
 
+      // 6. Sonuçları Birleştirip Mükerrerleri Ayıklama
       const combined = [...authorWorks, ...filteredGeneralWorks];
       const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
@@ -155,10 +179,10 @@ function App() {
               borderRadius: '8px',
               border: '1px solid #cbd5e1',
               fontSize: '15px',
-              backgroundColor: '#ffffff', // Beyaz arka plan
-              color: '#0f172a', // Koyu renk yazı
+              backgroundColor: '#ffffff',
+              color: '#0f172a',
               outline: 'none',
-              WebkitAppearance: 'none' // Mobil varsayılan stilleri sıfırlama
+              WebkitAppearance: 'none'
             }}
           />
           <button
