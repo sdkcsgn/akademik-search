@@ -98,7 +98,7 @@ function App() {
                 <a href={item.doi} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '12px', color: '#4f46e5', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
                   Makaleye Git (DOI) →
                 </a>
-              })}
+              )}
       </div>
     </div>
   </main>
