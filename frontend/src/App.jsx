@@ -73,7 +73,6 @@ function App() {
 
       setResults(uniqueResults);
 
-      // Geçmişe Kaydet (Geri Tuşu Çalışması İçin)
       if (!isHistoryNavigation) {
         window.history.pushState(
           { query: searchTerm, results: uniqueResults, searchTitle: title },
@@ -104,7 +103,6 @@ function App() {
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
 
-      // Geçmişe Kaydet
       window.history.pushState(
         { query, results: fetchedResults, searchTitle: title },
         '',
@@ -169,6 +167,16 @@ function App() {
               const journalName = item.primary_location?.source?.display_name;
               const journalUrl = item.primary_location?.source?.landing_page_url || item.primary_location?.source?.id;
 
+              // En sağlıklı makale URL'sini belirliyoruz:
+              const articleUrl = 
+                item.open_access?.oa_url || 
+                item.primary_location?.landing_page_url || 
+                item.primary_location?.pdf_url || 
+                item.doi;
+
+              // Alternatif olarak Google Scholar linki:
+              const scholarUrl = `https://scholar.google.com/scholar?q=${encodeURIComponent(item.title)}`;
+
               return (
                 <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                   <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>
@@ -226,16 +234,26 @@ function App() {
                     )}
                   </div>
 
-                  {item.doi && (
+                  <div style={{ display: 'flex', gap: '15px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    {articleUrl && (
+                      <a
+                        href={articleUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#4f46e5', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}
+                      >
+                        📄 Makaleye Git / Oku →
+                      </a>
+                    )}
                     <a
-                      href={item.doi}
+                      href={scholarUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ display: 'inline-block', marginTop: '12px', color: '#4f46e5', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}
+                      style={{ color: '#0284c7', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}
                     >
-                      Makaleye Git (DOI) →
+                      🔍 Google Scholar'da Ara ↗
                     </a>
-                  )}
+                  </div>
                 </div>
               );
             })}
