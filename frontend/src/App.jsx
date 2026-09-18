@@ -5,6 +5,7 @@ function App() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     if (!window.history.state) {
@@ -32,48 +33,33 @@ function App() {
     if (!searchTerm.trim()) return;
     setLoading(true);
     setResults([]);
+    setErrorMessage('');
     const title = `"${searchTerm}" için sonuçlar`;
     setSearchTitle(title);
 
     try {
       const cleanQuery = searchTerm.trim();
-      // Doğru mailto parametresi (ikinci mailto: eki kaldırıldı)
       const userMail = 'info@akademiksearch.com.tr';
 
-      // 1. Doğrudan Metin Araması
+      // SADECE TEK İSTEK: Tek sorgu ile rate limit (429) riskini en aza indiriyoruz
       const response = await fetch(
         `https://api.openalex.org/works?search=${encodeURIComponent(cleanQuery)}&per-page=50&mailto=${userMail}`
       );
-      
+
+      if (response.status === 429) {
+        setErrorMessage('Çok fazla arama yapıldığı için istek sınırına ulaşıldı. Lütfen 10-15 saniye bekleyip tekrar deneyin.');
+        setLoading(false);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(`API Hatası: ${response.status}`);
       }
 
       const data = await response.json();
-      let fetchedWorks = data.results || [];
+      const fetchedWorks = data.results || [];
 
-      // Eğer sonuç az gelirse yazar profilinden takviye yap
-      if (fetchedWorks.length < 5) {
-        const authorResponse = await fetch(
-          `https://api.openalex.org/authors?search=${encodeURIComponent(cleanQuery)}&mailto=${userMail}`
-        );
-        if (authorResponse.ok) {
-          const authorData = await authorResponse.json();
-          if (authorData.results && authorData.results.length > 0) {
-            const authorId = authorData.results[0].id;
-            const authorWorksRes = await fetch(
-              `https://api.openalex.org/works?filter=author.id:${authorId}&per-page=50&mailto=${userMail}`
-            );
-            if (authorWorksRes.ok) {
-              const authorWorksData = await authorWorksRes.json();
-              const additionalWorks = authorWorksData.results || [];
-              fetchedWorks = [...fetchedWorks, ...additionalWorks];
-            }
-          }
-        }
-      }
-
-      // Mükerrer olanları temizle
+      // Mükerrer kayıtları temizleme
       const uniqueResults = Array.from(new Map(fetchedWorks.map((item) => [item.id, item])).values());
 
       setResults(uniqueResults);
@@ -86,6 +72,7 @@ function App() {
       }
     } catch (error) {
       console.error('Arama sırasında hata oluştu:', error);
+      setErrorMessage('Arama sırasında bir bağlantı hatası oluştu.');
     } finally {
       setLoading(false);
     }
@@ -94,6 +81,7 @@ function App() {
   const fetchCitations = async (workId, articleTitle) => {
     setLoading(true);
     setResults([]);
+    setErrorMessage('');
     const title = `"${articleTitle}" makalesine atıf yapan çalışmalar`;
     setSearchTitle(title);
 
@@ -102,6 +90,13 @@ function App() {
       const response = await fetch(
         `https://api.openalex.org/works?filter=cites:${cleanWorkId}&per-page=50&mailto=info@akademiksearch.com.tr`
       );
+
+      if (response.status === 429) {
+        setErrorMessage('İstek sınırına ulaşıldı. Lütfen biraz bekleyip tekrar deneyin.');
+        setLoading(false);
+        return;
+      }
+
       const data = await response.json();
       const fetchedResults = data.results || [];
       setResults(fetchedResults);
@@ -165,13 +160,29 @@ function App() {
           </button>
         </form>
 
+        {errorMessage && (
+          <div style={{ textAlign: 'center', margin: '20px 0', padding: '15px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '14px' }}>{errorMessage}</p>
+            {query && (
+              <a
+                href={`https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-block', backgroundColor: '#0284c7', color: '#ffffff', padding: '8px 16px', borderRadius: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '13px' }}
+              >
+                🔍 Beklemeden Google Scholar'da Ara ↗
+              </a>
+            )}
+          </div>
+        )}
+
         {searchTitle && results.length > 0 && (
           <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '15px' }}>
             {searchTitle} — Toplam <strong>{results.length}</strong> sonuç bulundu.
           </p>
         )}
 
-        {results.length === 0 && !loading && query && (
+        {results.length === 0 && !loading && query && !errorMessage && (
           <div style={{ textAlign: 'center', marginTop: '30px', padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <p style={{ color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
               Aramanızla eşleşen sonuç bulunamadı.
