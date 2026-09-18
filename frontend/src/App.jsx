@@ -1,18 +1,36 @@
 ﻿import React, { useState, useEffect } from 'react';
 
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/İ/g, 'i')
+    .replace(/I/g, 'ı')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
+
 function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTitle, setSearchTitle] = useState('');
 
+  // Geri / İleri Tuşu İçin History Dinleyicisi
   useEffect(() => {
+    // Sayfa ilk yüklendiğinde mevcut durumu geçmişe kaydediyoruz
+    if (!window.history.state) {
+      window.history.replaceState({ query: '', results: [], searchTitle: '' }, '');
+    }
+
     const handlePopState = (event) => {
-      if (event.state) {
-        setQuery(event.state.query || '');
-        setResults(event.state.results || []);
-        setSearchTitle(event.state.searchTitle || '');
+      const state = event.state;
+      if (state) {
+        setQuery(state.query || '');
+        setResults(state.results || []);
+        setSearchTitle(state.searchTitle || '');
       } else {
+        setQuery('');
         setResults([]);
         setSearchTitle('');
       }
@@ -30,10 +48,10 @@ function App() {
     setSearchTitle(title);
 
     try {
-      const cleanQuery = searchTerm.trim().toLowerCase();
-      const parts = cleanQuery.split(' ').filter(p => p.length > 0);
+      const cleanQuery = searchTerm.trim();
+      const normQuery = normalizeText(cleanQuery);
+      const parts = normQuery.split(' ').filter(p => p.length > 0);
 
-      // 1. İsim Varyasyonlarını Oluşturma (ör: Emrah Koparan -> E. Koparan ve E Koparan)
       let searchQueries = [cleanQuery];
       if (parts.length >= 2) {
         const firstNameInitial = parts[0][0];
@@ -42,7 +60,6 @@ function App() {
         searchQueries.push(`${firstNameInitial} ${lastName}`);
       }
 
-      // 2. Yazar ID'lerini Bulma (Varyasyonlar İle)
       const authorPromises = searchQueries.map(q =>
         fetch(`https://api.openalex.org/authors?search=${encodeURIComponent(q)}`)
           .then(res => res.json())
@@ -54,16 +71,14 @@ function App() {
 
       const matchedAuthorIds = new Set();
       allAuthors.forEach(author => {
-        const name = (author.display_name || '').toLowerCase();
-        // Adın veya soyadın uyuşmasını kontrol et
-        const isMatch = parts.every(part => name.includes(part)) ||
-                        (parts.length >= 2 && name.includes(parts[parts.length - 1]));
+        const normAuthorName = normalizeText(author.display_name);
+        const isMatch = parts.every(part => normAuthorName.includes(part)) ||
+                        (parts.length >= 2 && normAuthorName.includes(parts[parts.length - 1]));
         if (isMatch && author.id) {
           matchedAuthorIds.add(author.id);
         }
       });
 
-      // 3. Yazar ID'lerine Göre Makaleleri Çekme
       let authorWorks = [];
       if (matchedAuthorIds.size > 0) {
         const targetIds = Array.from(matchedAuthorIds).slice(0, 5);
@@ -77,7 +92,6 @@ function App() {
         authorWorks = worksArrays.flat();
       }
 
-      // 4. Varyasyonlara Göre Metin Araması Yapma
       const generalPromises = searchQueries.map(q =>
         fetch(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=100`)
           .then(res => res.json())
@@ -87,18 +101,17 @@ function App() {
       const generalArrays = await Promise.all(generalPromises);
       const rawGeneralWorks = generalArrays.flat();
 
-      // 5. Alakasız Sonuçları Filtreleme (En az soyisim geçmeli)
       const lastName = parts[parts.length - 1];
       const filteredGeneralWorks = rawGeneralWorks.filter(work => {
-        const titleText = (work.title || '').toLowerCase();
+        const titleText = normalizeText(work.title);
         const authorsText = (work.authorships || [])
-          .map(a => (a.author?.display_name || '').toLowerCase())
+          .map(a => normalizeText(a.author?.display_name))
           .join(' ');
         
-        return titleText.includes(lastName) || authorsText.includes(lastName);
+        const fullContent = titleText + ' ' + authorsText;
+        return fullContent.includes(lastName);
       });
 
-      // 6. Sonuçları Birleştirip Mükerrerleri Ayıklama
       const combined = [...authorWorks, ...filteredGeneralWorks];
       const uniqueResults = Array.from(new Map(combined.map(item => [item.id, item])).values());
 
@@ -107,8 +120,7 @@ function App() {
       if (!isHistoryNavigation) {
         window.history.pushState(
           { query: searchTerm, results: uniqueResults, searchTitle: title },
-          '',
-          window.location.href
+          ''
         );
       }
     } catch (error) {
@@ -135,8 +147,7 @@ function App() {
 
       window.history.pushState(
         { query, results: fetchedResults, searchTitle: title },
-        '',
-        window.location.href
+        ''
       );
     } catch (error) {
       console.error('Atıf listesi çekilemedi:', error);
@@ -172,7 +183,7 @@ function App() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Makale, yazar adı (ör: Emrah Koparan) veya konu girin..."
+            placeholder="Makale, yazar adı (ör: Emrah Koparan, Sevcan Yıldız) veya konu girin..."
             style={{
               flex: 1,
               padding: '12px 16px',
@@ -200,9 +211,19 @@ function App() {
         )}
 
         {results.length === 0 && !loading && query && (
-          <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '20px' }}>
-            Aramanızla eşleşen sonuç bulunamadı.
-          </p>
+          <div style={{ textAlign: 'center', marginTop: '30px', padding: '20px', backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <p style={{ color: '#64748b', fontSize: '15px', marginBottom: '12px' }}>
+              OpenAlex veritabanında "<strong>{query}</strong>" için doğrudan sonuç bulunamadı.
+            </p>
+            <a
+              href={`https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'inline-block', backgroundColor: '#0284c7', color: '#ffffff', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}
+            >
+              🔍 Google Scholar üzerinde "{query}" Araması Yap ↗
+            </a>
+          </div>
         )}
 
         {results.length > 0 && (
