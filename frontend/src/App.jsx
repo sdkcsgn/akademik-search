@@ -10,7 +10,10 @@ function App() {
     if (!query) return;
     setLoading(true);
     try {
-      const response = await fetch(`https://api.openalex.org/works?search=${encodeURIComponent(query)}`);
+      // OpenAlex API: Türkçe dil filtresi ve tam arama mantığı
+      const response = await fetch(
+        `https://api.openalex.org/works?search=${encodeURIComponent(query)}&filter=language:tr`
+      );
       const data = await response.json();
       setResults(data.results || []);
     } catch (error) {
@@ -23,7 +26,7 @@ function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', padding: '20px' }}>
       <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#0f172a' }}>Türkiye Odaklı Akademik Arama Engine</h1>
+        <h1 style={{ color: '#0f172a' }}>Türkiye Odaklı Akademik Arama Motoru</h1>
         <p style={{ color: '#475569' }}>Milyonlarca akademik makale ve yazar arasında arama yapın</p>
       </header>
 
@@ -56,14 +59,22 @@ function App() {
               <div key={item.id} style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                 <h3 style={{ margin: '0 0 10px', fontSize: '18px', color: '#1e293b' }}>{item.title}</h3>
                 <p style={{ margin: '0 0 8px', fontSize: '14px', color: '#475569' }}>
-                  <strong>Yazarlar: </strong>{item.authorships ? item.authorships.map(a => a.author.display_name).join(', ') : 'Bilinmiyor'}
+                  <strong>Yazarlar: </strong>
+                  {item.authorships && item.authorships.length > 0
+                    ? item.authorships.map(a => a.author.display_name).join(', ')
+                    : 'Bilinmiyor'}
                 </p>
                 <div style={{ display: 'flex', gap: '15px', fontSize: '13px', color: '#64748b', flexWrap: 'wrap' }}>
                   <span>📅 Yıl: {item.publication_year || 'N/A'}</span>
                   <span>📊 Atıf Sayısı: {item.cited_by_count}</span>
                 </div>
                 {item.doi && (
-                  <a href={item.doi} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '12px', color: '#4f46e5', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
+                  <a
+                    href={item.doi}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-block', marginTop: '12px', color: '#4f46e5', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}
+                  >
                     Makaleye Git (DOI) →
                   </a>
                 )}
