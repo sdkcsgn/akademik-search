@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
@@ -9,7 +9,7 @@ app.use(express.json());
 
 // Türkçe karakter dönüştürücü
 const normalizeText = (text) => {
-  if (!text) return '';
+  if (!text || typeof text !== 'string') return '';
   return text
     .toLowerCase()
     .replace(/ğ/g, 'g')
@@ -30,23 +30,32 @@ app.get('/api/search', async (req, res) => {
 
     const normalizedQuery = normalizeText(query).trim();
     const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(normalizedQuery)}`;
-    const response = await axios.get(searchUrl);
-    let rawResults = response.data.results || [];
+    
+    // OpenAlex isteği için User-Agent başlığı eklendi
+    const response = await axios.get(searchUrl, {
+      headers: {
+        'User-Agent': 'AkademikSearchApp/1.0 (mailto:admin@akademiksearch.com.tr)'
+      }
+    });
 
-    let results = rawResults.map(item => {
-      const authors = item.authorships
-        ? item.authorships.map(a => a.author ? a.author.display_name : '').filter(Boolean)
+    const rawResults = response.data?.results || [];
+
+    const results = rawResults.map(item => {
+      // Yazarları güvenli şekilde çıkar
+      const authors = Array.isArray(item.authorships)
+        ? item.authorships
+            .map(a => a?.author?.display_name || '')
+            .filter(name => typeof name === 'string' && name.trim() !== '')
         : [];
 
-      const venue = item.primary_location && item.primary_location.source
-        ? item.primary_location.source.display_name
-        : null;
+      // Yayın yerini güvenli şekilde çıkar
+      const venue = item?.primary_location?.source?.display_name || null;
 
       // Akıllı Önceliklendirme Skoru
       let score = 0;
       const normalizedTitle = normalizeText(item.title);
       
-      // Aranan isim yazarlar arasında birebir geçiyorsa en yüksek önceliği ver
+      // Aranan isim yazarlar arasında geçiyorsa en yüksek önceliği ver
       const hasAuthorMatch = authors.some(author => 
         normalizeText(author).includes(normalizedQuery)
       );
@@ -57,23 +66,23 @@ app.get('/api/search', async (req, res) => {
 
       return {
         id: item.id,
-        title: item.title,
-        publication_year: item.publication_year,
-        doi: item.doi,
-        cited_by_count: item.cited_by_count,
+        title: item.title || 'Başlıksız Çalışma',
+        publication_year: item.publication_year || null,
+        doi: item.doi || null,
+        cited_by_count: item.cited_by_count || 0,
         authors: authors.slice(0, 5),
         venue: venue,
         score: score
       };
     });
 
-    // Önce skora göre (yazarı/başlığı eşleşenler en üste), ardından atıf sayısına göre sırala
+    // Önce skora göre (yazar/başlık eşleşenler üstte), sonra atıf sayısına göre sırala
     results.sort((a, b) => b.score - a.score || (b.cited_by_count || 0) - (a.cited_by_count || 0));
 
     return res.json({ results });
   } catch (error) {
-    console.error('API Hatası:', error);
-    return res.status(500).json({ error: 'Sunucu hatası' });
+    console.error('API Arama Hatası:', error.response?.data || error.message);
+    return res.status(500).json({ error: 'Arama sırasında bir sunucu hatası oluştu.' });
   }
 });
 
