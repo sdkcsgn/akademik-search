@@ -7,20 +7,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Türkçe karakterleri Ýngilizce karakterlere çeviren yardýmcý fonksiyon
+// TÃ¼rkÃ§e karakter dÃ¶nÃ¼ÅŸtÃ¼rÃ¼cÃ¼
 const normalizeText = (text) => {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/ð/g, 'g')
-    .replace(/ü/g, 'u')
-    .replace(/þ/g, 's')
-    .replace(/ý/g, 'i')
-    .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c');
+    .replace(/ÄŸ/g, 'g')
+    .replace(/Ã¼/g, 'u')
+    .replace(/ÅŸ/g, 's')
+    .replace(/Ä±/g, 'i')
+    .replace(/Ã¶/g, 'o')
+    .replace(/Ã§/g, 'c');
 };
 
-// 1. API Arama Rotasý
+// API Arama RotasÄ±
 app.get('/api/search', async (req, res) => {
   try {
     const query = req.query.q;
@@ -28,7 +28,8 @@ app.get('/api/search', async (req, res) => {
       return res.status(400).json({ error: 'Arama terimi girilmedi.' });
     }
 
-    const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(normalizeText(query))}`;
+    const normalizedQuery = normalizeText(query).trim();
+    const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(normalizedQuery)}`;
     const response = await axios.get(searchUrl);
     let rawResults = response.data.results || [];
 
@@ -41,6 +42,19 @@ app.get('/api/search', async (req, res) => {
         ? item.primary_location.source.display_name
         : null;
 
+      // AkÄ±llÄ± Ã–nceliklendirme Skoru
+      let score = 0;
+      const normalizedTitle = normalizeText(item.title);
+      
+      // Aranan isim yazarlar arasÄ±nda birebir geÃ§iyorsa en yÃ¼ksek Ã¶nceliÄŸi ver
+      const hasAuthorMatch = authors.some(author => 
+        normalizeText(author).includes(normalizedQuery)
+      );
+      if (hasAuthorMatch) score += 100;
+
+      // BaÅŸlÄ±kta geÃ§iyorsa ek puan ver
+      if (normalizedTitle.includes(normalizedQuery)) score += 50;
+
       return {
         id: item.id,
         title: item.title,
@@ -48,27 +62,30 @@ app.get('/api/search', async (req, res) => {
         doi: item.doi,
         cited_by_count: item.cited_by_count,
         authors: authors.slice(0, 5),
-        venue: venue
+        venue: venue,
+        score: score
       };
     });
 
+    // Ã–nce skora gÃ¶re (yazarÄ±/baÅŸlÄ±ÄŸÄ± eÅŸleÅŸenler en Ã¼ste), ardÄ±ndan atÄ±f sayÄ±sÄ±na gÃ¶re sÄ±rala
+    results.sort((a, b) => b.score - a.score || (b.cited_by_count || 0) - (a.cited_by_count || 0));
+
     return res.json({ results });
   } catch (error) {
-    console.error('API Hatasý:', error);
-    return res.status(500).json({ error: 'Sunucu hatasý' });
+    console.error('API HatasÄ±:', error);
+    return res.status(500).json({ error: 'Sunucu hatasÄ±' });
   }
 });
 
-// 2. React Statik Dosyalarýný Sunma Middleware'i
+// React Statik DosyalarÄ±
 app.use(express.static(path.join(__dirname, 'frontend/build')));
 
-// 3. React Router Fallback Yönlendirmesi
+// Fallback YÃ¶nlendirmesi
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
 });
 
-// 4. Port Tanýmý ve Render Ýçin '0.0.0.0' IP Baðlantýsý
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Sunucu ${PORT} portunda ve 0.0.0.0 IP adresinde aktif.`);
+  console.log(`Sunucu ${PORT} portunda aktif.`);
 });
