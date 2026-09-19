@@ -108,9 +108,18 @@ app.get('/api/search', async (req, res) => {
       }
     }).filter(Boolean);
 
-    results.sort((a, b) => b.score - a.score || (b.cited_by_count || 0) - (a.cited_by_count || 0));
+// Sadece aranan yazarın TAM adıyla eşleşen yayınları göster
+const exactAuthorResults = results.filter(item =>
+  item.authors.some(author =>
+    normalizeText(author).trim() === normalizedQuery
+  )
+);
 
-    return res.json({ results });
+exactAuthorResults.sort(
+  (a, b) => (b.cited_by_count || 0) - (a.cited_by_count || 0)
+);
+
+return res.json({ results: exactAuthorResults });
   } catch (error) {
     console.error('[SERVER ERROR] /api/search hatası:', error.message);
     return res.status(500).json({ 
