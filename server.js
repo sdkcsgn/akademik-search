@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
@@ -31,7 +31,7 @@ app.get('/api/search', async (req, res) => {
     const normalizedQuery = normalizeText(query).trim();
     const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(normalizedQuery)}`;
     
-    // OpenAlex için zorunlu User-Agent başlığı
+    // OpenAlex API için zorunlu User-Agent başlığı
     const response = await axios.get(searchUrl, {
       headers: {
         'User-Agent': 'AkademikSearchApp/1.0 (mailto:admin@akademiksearch.com.tr)'
@@ -50,7 +50,7 @@ app.get('/api/search', async (req, res) => {
 
       const venue = item?.primary_location?.source?.display_name || null;
 
-      // Yazar ve başlık önceliklendirme skoru
+      // Akıllı Önceliklendirme Skoru (Yazar ismi eşleşmesine +100 puan)
       let score = 0;
       const normalizedTitle = normalizeText(item.title);
       
@@ -73,7 +73,7 @@ app.get('/api/search', async (req, res) => {
       };
     });
 
-    // Skora göre (yazar/başlık eşleşen üstte), ardından atıf sayısına göre sırala
+    // Önce skora göre (yazar/başlık eşleşen üstte), ardından atıf sayısına göre sırala
     results.sort((a, b) => b.score - a.score || (b.cited_by_count || 0) - (a.cited_by_count || 0));
 
     return res.json({ results });
