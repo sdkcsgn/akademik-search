@@ -20,7 +20,7 @@ const normalizeText = (text) => {
     .replace(/ç/g, 'c');
 };
 
-// 1. Önce API rotamýz tanýmlanýr
+// 1. API Arama Rotasý
 app.get('/api/search', async (req, res) => {
   try {
     const query = req.query.q;
@@ -54,18 +54,21 @@ app.get('/api/search', async (req, res) => {
 
     return res.json({ results });
   } catch (error) {
-    console.error(error);
+    console.error('API Hatasý:', error);
     return res.status(500).json({ error: 'Sunucu hatasý' });
   }
 });
 
-// 2. Sonra frontend statik dosyalarý dýþ dünyaya açýlýr
+// 2. React Statik Dosyalarýný Sunma Middleware'i
 app.use(express.static(path.join(__dirname, 'frontend/build')));
 
-// 3. En sonda React Router / fallback yönlendirmesi yer alýr
+// 3. React Router Fallback Yönlendirmesi
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
 });
 
+// 4. Port Tanýmý ve Render Ýçin '0.0.0.0' IP Baðlantýsý
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Sunucu ${PORT} portunda aktif.`));
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Sunucu ${PORT} portunda ve 0.0.0.0 IP adresinde aktif.`);
+});
