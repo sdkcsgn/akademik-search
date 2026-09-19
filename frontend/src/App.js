@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 function App() {
   const [query, setQuery] = useState('');
@@ -91,10 +91,10 @@ function App() {
             <h3 style={{ margin: '0 0 8px 0', fontSize: '18px' }}>
               {item.doi ? (
                 <a href={item.doi} target="_blank" rel="noopener noreferrer" style={{ color: '#2b6cb0', textDecoration: 'none' }}>
-                  {item.title || 'Başlıksız Çalışma'}
+                  {item.title}
                 </a>
               ) : (
-                <span style={{ color: '#2d3748' }}>{item.title || 'Başlıksız Çalışma'}</span>
+                <span style={{ color: '#2d3748' }}>{item.title}</span>
               )}
             </h3>
             

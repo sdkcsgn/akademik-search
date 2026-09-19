@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Türkçe karakter dönüştürücü
+// Türkçe karakter ve metin temizleme fonksiyonu
 const normalizeText = (text) => {
   if (!text || typeof text !== 'string') return '';
   return text
@@ -31,7 +31,7 @@ app.get('/api/search', async (req, res) => {
     const normalizedQuery = normalizeText(query).trim();
     const searchUrl = `https://api.openalex.org/works?search=${encodeURIComponent(normalizedQuery)}`;
     
-    // OpenAlex isteği için User-Agent başlığı eklendi
+    // OpenAlex için zorunlu User-Agent başlığı
     const response = await axios.get(searchUrl, {
       headers: {
         'User-Agent': 'AkademikSearchApp/1.0 (mailto:admin@akademiksearch.com.tr)'
@@ -41,27 +41,24 @@ app.get('/api/search', async (req, res) => {
     const rawResults = response.data?.results || [];
 
     const results = rawResults.map(item => {
-      // Yazarları güvenli şekilde çıkar
+      // Yazarları güvenli biçimde ayıkla
       const authors = Array.isArray(item.authorships)
         ? item.authorships
             .map(a => a?.author?.display_name || '')
             .filter(name => typeof name === 'string' && name.trim() !== '')
         : [];
 
-      // Yayın yerini güvenli şekilde çıkar
       const venue = item?.primary_location?.source?.display_name || null;
 
-      // Akıllı Önceliklendirme Skoru
+      // Yazar ve başlık önceliklendirme skoru
       let score = 0;
       const normalizedTitle = normalizeText(item.title);
       
-      // Aranan isim yazarlar arasında geçiyorsa en yüksek önceliği ver
       const hasAuthorMatch = authors.some(author => 
         normalizeText(author).includes(normalizedQuery)
       );
       if (hasAuthorMatch) score += 100;
 
-      // Başlıkta geçiyorsa ek puan ver
       if (normalizedTitle.includes(normalizedQuery)) score += 50;
 
       return {
@@ -76,7 +73,7 @@ app.get('/api/search', async (req, res) => {
       };
     });
 
-    // Önce skora göre (yazar/başlık eşleşenler üstte), sonra atıf sayısına göre sırala
+    // Skora göre (yazar/başlık eşleşen üstte), ardından atıf sayısına göre sırala
     results.sort((a, b) => b.score - a.score || (b.cited_by_count || 0) - (a.cited_by_count || 0));
 
     return res.json({ results });
@@ -86,10 +83,10 @@ app.get('/api/search', async (req, res) => {
   }
 });
 
-// React Statik Dosyaları
+// React Statik Derleme Dosyaları Servisi
 app.use(express.static(path.join(__dirname, 'frontend/build')));
 
-// Fallback Yönlendirmesi
+// Yönlendirme (Fallback)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend/build', 'index.html'));
 });
