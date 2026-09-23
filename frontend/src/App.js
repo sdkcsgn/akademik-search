@@ -16,7 +16,7 @@ function App() {
     setSearched(true);
 
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`https://akademiksearch.com.tr/api/search?q=${encodeURIComponent(query)}`);  
       if (!response.ok) {
         throw new Error('Arama sırasında bir hata oluştu.');
       }
